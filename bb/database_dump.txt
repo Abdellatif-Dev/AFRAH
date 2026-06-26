@@ -1,0 +1,198 @@
+
+=== TABLE: categories ===
+-- CREATE TABLE categories (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    image TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+[
+  {
+    "id": 1,
+    "title": "lmkmksqd",
+    "image": "",
+    "description": "fsdgfdg ",
+    "created_at": "2026-06-22 20:17:00"
+  },
+  {
+    "id": 2,
+    "title": "BBBB",
+    "image": "1782392667558-663510381.png",
+    "description": "JHSDJKFS",
+    "created_at": "2026-06-25 13:04:27"
+  }
+]
+
+=== TABLE: contacts ===
+-- CREATE TABLE contacts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+[]
+
+=== TABLE: event_media ===
+-- CREATE TABLE event_media (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    event_id INTEGER NOT NULL,
+    type TEXT CHECK(type IN ('image','video')) NOT NULL,
+    file_name TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (event_id) REFERENCES events(id) ON DELETE CASCADE
+  )
+[
+  {
+    "id": 1,
+    "event_id": 1,
+    "type": "image",
+    "file_name": "1782392616228-155433805.png",
+    "created_at": "2026-06-25 13:03:36"
+  }
+]
+
+=== TABLE: events ===
+-- CREATE TABLE events (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    address TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+  )
+[
+  {
+    "id": 1,
+    "category_id": 1,
+    "title": "jhskdhf",
+    "address": "khsqjkdl",
+    "description": "jkdslhkfjlsdhjkflqs",
+    "created_at": "2026-06-25 13:02:37"
+  },
+  {
+    "id": 2,
+    "category_id": 2,
+    "title": "HDKSFHJK",
+    "address": "KDLSIFIO",
+    "description": "JKHKSDHFKJSLF",
+    "created_at": "2026-06-25 13:04:41"
+  }
+]
+
+=== TABLE: orders ===
+-- CREATE TABLE orders (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    customer_name TEXT NOT NULL,
+    phone TEXT NOT NULL,
+    address TEXT DEFAULT '',
+    event_date TEXT NOT NULL,
+    package_id INTEGER,
+    notes TEXT DEFAULT '',
+    status TEXT DEFAULT 'pending' CHECK(status IN ('pending','confirmed','canceled')),
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE SET NULL
+  )
+[]
+
+=== TABLE: package_items ===
+-- CREATE TABLE package_items (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    package_id INTEGER NOT NULL,
+    item TEXT NOT NULL,
+    type TEXT DEFAULT 'gratuite' CHECK(type IN ('gratuite','pay')),
+    FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
+  )
+[
+  {
+    "id": 1,
+    "package_id": 1,
+    "item": "SQHDKQSLH",
+    "type": "gratuite"
+  },
+  {
+    "id": 2,
+    "package_id": 2,
+    "item": "JDHSMFKHDSK",
+    "type": "gratuite"
+  }
+]
+
+=== TABLE: packages ===
+-- CREATE TABLE packages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    category_id INTEGER,
+    title TEXT NOT NULL,
+    price REAL NOT NULL,
+    image TEXT DEFAULT '',
+    description TEXT DEFAULT '',
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE SET NULL
+  )
+[
+  {
+    "id": 1,
+    "category_id": null,
+    "title": "jhqsdjklqh",
+    "price": 123456,
+    "image": "1782392602798-939106897.png",
+    "description": "HDSKMFHDSK"
+  },
+  {
+    "id": 2,
+    "category_id": 2,
+    "title": "VVVV",
+    "price": 1000,
+    "image": "1782392709428-333661301.png",
+    "description": "KJDSHFKJLSHDKJF"
+  }
+]
+
+=== TABLE: sqlite_sequence ===
+-- CREATE TABLE sqlite_sequence(name,seq)
+[
+  {
+    "name": "users",
+    "seq": 4
+  },
+  {
+    "name": "categories",
+    "seq": 2
+  },
+  {
+    "name": "events",
+    "seq": 2
+  },
+  {
+    "name": "packages",
+    "seq": 2
+  },
+  {
+    "name": "package_items",
+    "seq": 2
+  },
+  {
+    "name": "event_media",
+    "seq": 1
+  }
+]
+
+=== TABLE: users ===
+-- CREATE TABLE users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL,
+    password TEXT NOT NULL,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+  )
+[
+  {
+    "id": 1,
+    "name": "Admin",
+    "email": "admin@afrah.com",
+    "password": "$2a$10$0p8YO7Vf6YOPRh8w3jug5Ozf.TApSckVLcuT1JxKQKsnRljOTVDjK",
+    "created_at": "2026-06-22 20:12:47"
+  }
+]
+=== DATABASE DUMP COMPLETE ===

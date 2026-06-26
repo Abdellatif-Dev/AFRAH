@@ -1,0 +1,30 @@
+2026/06/26-17:39:46.346 5d8 Reusing MANIFEST C:\Users\ABDO\Desktop\aff\bb\whatsapp-data\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/MANIFEST-000001
+2026/06/26-17:39:46.347 5d8 Recovering log #291
+2026/06/26-17:39:46.587 5d8 Reusing old log C:\Users\ABDO\Desktop\aff\bb\whatsapp-data\session\Default\IndexedDB\https_web.whatsapp.com_0.indexeddb.leveldb/000291.log 
+2026/06/26-17:40:12.015 1300 Level-0 table #300: started
+2026/06/26-17:40:12.052 1300 Level-0 table #300: 1101678 bytes OK
+2026/06/26-17:40:12.055 1300 Delete type=0 #291
+2026/06/26-17:40:51.998 5d8 Compacting 1@1 + 11@2 files
+2026/06/26-17:40:52.200 5d8 Generated table #301@1: 44208 keys, 2176414 bytes
+2026/06/26-17:40:52.331 5d8 Generated table #302@1: 100219 keys, 2250676 bytes
+2026/06/26-17:40:52.431 5d8 Generated table #303@1: 69030 keys, 2241675 bytes
+2026/06/26-17:40:52.489 5d8 Generated table #304@1: 21259 keys, 2174463 bytes
+2026/06/26-17:40:52.528 5d8 Generated table #305@1: 3205 keys, 2156863 bytes
+2026/06/26-17:40:52.561 5d8 Generated table #306@1: 2831 keys, 2151237 bytes
+2026/06/26-17:40:52.616 5d8 Generated table #307@1: 2446 keys, 2153826 bytes
+2026/06/26-17:40:52.706 5d8 Generated table #308@1: 30667 keys, 2244066 bytes
+2026/06/26-17:40:52.775 5d8 Generated table #309@1: 20267 keys, 1734291 bytes
+2026/06/26-17:40:52.775 5d8 Compacted 1@1 + 11@2 files => 19283511 bytes
+2026/06/26-17:40:52.776 5d8 compacted to: files[ 0 0 10 0 0 0 0 ]
+2026/06/26-17:40:52.776 5d8 Delete type=2 #279
+2026/06/26-17:40:52.776 5d8 Delete type=2 #286
+2026/06/26-17:40:52.776 5d8 Delete type=2 #287
+2026/06/26-17:40:52.776 5d8 Delete type=2 #288
+2026/06/26-17:40:52.776 5d8 Delete type=2 #289
+2026/06/26-17:40:52.776 5d8 Delete type=2 #290
+2026/06/26-17:40:52.776 5d8 Delete type=2 #293
+2026/06/26-17:40:52.777 5d8 Delete type=2 #294
+2026/06/26-17:40:52.777 5d8 Delete type=2 #295
+2026/06/26-17:40:52.777 5d8 Delete type=2 #296
+2026/06/26-17:40:52.777 5d8 Delete type=2 #297
+2026/06/26-17:40:52.777 5d8 Delete type=2 #300

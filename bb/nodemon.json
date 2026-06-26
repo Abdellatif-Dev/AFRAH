@@ -1,0 +1,11 @@
+{
+  "watch": ["server.js", "routes", "controllers"],
+  "ignore": [
+    "whatsapp-data/**",
+    "node_modules/**",
+    "*.db",
+    "*.sqlite",
+    "session/**",
+    "**/Cache/**"
+  ]
+}
