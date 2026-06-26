@@ -24,22 +24,55 @@ router.get('/', (req, res) => {
 
   const where = conditions.length > 0 ? ' WHERE ' + conditions.join(' AND ') : '';
 
-  let query = `SELECT p.*, c.title as category_title FROM packages p LEFT JOIN categories c ON p.category_id = c.id${where} ORDER BY p.price ASC`;
-
-  db.all(query, params, (err, packages) => {
-    if (err) return res.status(500).json({ message: 'Server error' });
-    if (packages.length === 0) return res.json([]);
-
-    const ids = packages.map(p => p.id);
-    const placeholders = ids.map(() => '?').join(',');
-    db.all(`SELECT * FROM package_items WHERE package_id IN (${placeholders})`, ids, (err, items) => {
+  // If page is not requested, return flat array of all packages with their items (compatibility with public pages)
+  if (!req.query.page) {
+    const dataSql = `SELECT p.*, c.title as category_title FROM packages p LEFT JOIN categories c ON p.category_id = c.id${where} ORDER BY p.price ASC`;
+    db.all(dataSql, params, (err, packages) => {
       if (err) return res.status(500).json({ message: 'Server error' });
+      if (packages.length === 0) return res.json([]);
 
-      const result = packages.map(pkg => ({
-        ...pkg,
-        items: items.filter(item => item.package_id === pkg.id).map(i => ({ item: i.item, type: i.type }))
-      }));
-      res.json(result);
+      const ids = packages.map(p => p.id);
+      const placeholders = ids.map(() => '?').join(',');
+      db.all(`SELECT * FROM package_items WHERE package_id IN (${placeholders})`, ids, (err, items) => {
+        if (err) return res.status(500).json({ message: 'Server error' });
+
+        const result = packages.map(pkg => ({
+          ...pkg,
+          items: items.filter(item => item.package_id === pkg.id).map(i => ({ item: i.item, type: i.type }))
+        }));
+        res.json(result);
+      });
+    });
+    return;
+  }
+
+  const page = parseInt(req.query.page) || 1;
+  const perPage = parseInt(req.query.per_page) || 6;
+  const offset = (page - 1) * perPage;
+
+  // Count total
+  const countSql = `SELECT COUNT(*) as total FROM packages p${where}`;
+  db.get(countSql, params, (errCount, countRow) => {
+    if (errCount) return res.status(500).json({ message: 'Server error' });
+
+    const total = countRow ? countRow.total : 0;
+    const dataSql = `SELECT p.*, c.title as category_title FROM packages p LEFT JOIN categories c ON p.category_id = c.id${where} ORDER BY p.price ASC LIMIT ? OFFSET ?`;
+
+    db.all(dataSql, [...params, perPage, offset], (err, packages) => {
+      if (err) return res.status(500).json({ message: 'Server error' });
+      if (packages.length === 0) return res.json({ data: [], total });
+
+      const ids = packages.map(p => p.id);
+      const placeholders = ids.map(() => '?').join(',');
+      db.all(`SELECT * FROM package_items WHERE package_id IN (${placeholders})`, ids, (err, items) => {
+        if (err) return res.status(500).json({ message: 'Server error' });
+
+        const result = packages.map(pkg => ({
+          ...pkg,
+          items: items.filter(item => item.package_id === pkg.id).map(i => ({ item: i.item, type: i.type }))
+        }));
+        res.json({ data: result, total });
+      });
     });
   });
 });

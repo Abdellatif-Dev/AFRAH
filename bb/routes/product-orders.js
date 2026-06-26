@@ -191,7 +191,7 @@ _Afrah - Mariage & Événements_`;
 
 // ✅ ROUTE JDIAD — Confirmer b link
 router.get('/:id/confirm', (req, res) => {
-  const { id } = req.params;
+  const id = parseInt(req.params.id, 10);
 
   db.run('UPDATE product_orders SET status = ? WHERE id = ?', ['confirmed', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
@@ -291,7 +291,7 @@ _Afrah - Mariage & Événements_`;
 
 // ✅ ROUTE JDIAD — Annuler b link
 router.get('/:id/cancel', (req, res) => {
-  const { id } = req.params;
+  const id = parseInt(req.params.id, 10);
 
   db.run('UPDATE product_orders SET status = ? WHERE id = ?', ['canceled', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');

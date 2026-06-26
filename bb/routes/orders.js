@@ -217,7 +217,7 @@ _Afrah - Mariage & Événements_`;
 
 // ✅ ROUTES JDIAD — BACH Y9DER YACCEPTE WLA YREFUSE B LINK
 router.get('/:id/confirm', (req, res) => {
-  const { id } = req.params;
+  const id = parseInt(req.params.id, 10);
 
   db.run('UPDATE orders SET status = ? WHERE id = ?', ['confirmed', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
@@ -318,7 +318,7 @@ _Afrah - Mariage & Événements_`;
 });
 
 router.get('/:id/cancel', (req, res) => {
-  const { id } = req.params;
+  const id = parseInt(req.params.id, 10);
 
   db.run('UPDATE orders SET status = ? WHERE id = ?', ['canceled', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');

@@ -6,19 +6,39 @@ const router = express.Router();
 
 router.get('/', (req, res) => {
   const { category_id, search } = req.query;
-  let sql = `SELECT p.*, pc.title as category_title FROM products p LEFT JOIN product_categories pc ON p.category_id = pc.id`;
+
+  const conditions = [];
   const params = [];
-  const where = [];
 
-  if (category_id) { where.push('p.category_id = ?'); params.push(category_id); }
-  if (search) { where.push('(p.title LIKE ? OR p.description LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
+  if (category_id) { conditions.push('p.category_id = ?'); params.push(category_id); }
+  if (search) { conditions.push('(p.title LIKE ? OR p.description LIKE ?)'); params.push(`%${search}%`, `%${search}%`); }
 
-  if (where.length) sql += ' WHERE ' + where.join(' AND ');
-  sql += ' ORDER BY p.created_at DESC';
+  const whereClause = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
 
-  db.all(sql, params, (err, rows) => {
-    if (err) return res.status(500).json({ message: 'Server error' });
-    res.json(rows);
+  // If page is not requested, return flat array of all products (compatibility with public pages)
+  if (!req.query.page) {
+    const sql = `SELECT p.*, pc.title as category_title FROM products p LEFT JOIN product_categories pc ON p.category_id = pc.id${whereClause} ORDER BY p.created_at DESC`;
+    db.all(sql, params, (err, rows) => {
+      if (err) return res.status(500).json({ message: 'Server error' });
+      res.json(rows);
+    });
+    return;
+  }
+
+  const page = parseInt(req.query.page) || 1;
+  const perPage = parseInt(req.query.per_page) || 8;
+  const offset = (page - 1) * perPage;
+
+  const countSql = `SELECT COUNT(*) as total FROM products p${whereClause}`;
+  db.get(countSql, params, (errCount, countRow) => {
+    if (errCount) return res.status(500).json({ message: 'Server error' });
+
+    const total = countRow ? countRow.total : 0;
+    const dataSql = `SELECT p.*, pc.title as category_title FROM products p LEFT JOIN product_categories pc ON p.category_id = pc.id${whereClause} ORDER BY p.created_at DESC LIMIT ? OFFSET ?`;
+    db.all(dataSql, [...params, perPage, offset], (err, rows) => {
+      if (err) return res.status(500).json({ message: 'Server error' });
+      res.json({ data: rows, total });
+    });
   });
 });
 
