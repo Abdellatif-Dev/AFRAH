@@ -11,17 +11,23 @@ const router = express.Router();
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
 
 router.post('/', (req, res) => {
+  console.log('📩 [Orders] Received package order request:', req.body);
   const { customer_name, phone, address, event_date, package_id, notes } = req.body;
   if (!customer_name || !phone) {
+    console.warn('⚠️ [Orders] Missing required fields:', { customer_name, phone });
     return res.status(400).json({ message: 'Name and phone are required' });
   }
 
   db.run('INSERT INTO orders (customer_name, phone, address, event_date, package_id, notes) VALUES (?, ?, ?, ?, ?, ?)',
     [customer_name, phone, address || '', event_date || '', package_id || null, notes || ''],
     function (err) {
-      if (err) return res.status(500).json({ message: 'Server error' });
+      if (err) {
+        console.error('❌ [Orders] Database insertion error:', err.message);
+        return res.status(500).json({ message: 'Server error' });
+      }
 
       const orderId = this.lastID;
+      console.log('✅ [Orders] Order inserted into DB with ID:', orderId);
 
       res.status(201).json({ id: orderId, message: 'Order placed successfully' });
 
@@ -31,7 +37,15 @@ router.post('/', (req, res) => {
         LEFT JOIN packages p ON o.package_id = p.id
         WHERE o.id = ?
       `, [orderId], async (err, order) => {
-        if (err || !order) return;
+        if (err) {
+          console.error('❌ [Orders] Error fetching order for WhatsApp:', err.message);
+          return;
+        }
+        if (!order) {
+          console.warn('⚠️ [Orders] Order not found in DB after insertion:', orderId);
+          return;
+        }
+        console.log('📦 [Orders] Fetched order details for WhatsApp:', order);
 
         // ✅ LINKS JDIAD BACH Y9DER YACCEPTE WLA YREFUSE
         const confirmLink = `${BASE_URL}/api/orders/${order.id}/confirm`;
@@ -82,13 +96,19 @@ _Afrah - Mariage & Événements_`;
           ? path.join(baseDir, 'uploads', 'packages', order.package_image)
           : null;
 
+        console.log(`📱 [Orders] Dispatched orders.phone: ${order.phone}. package_image: ${order.package_image} (Path: ${imagePath}, Exists: ${imagePath ? fs.existsSync(imagePath) : 'no'})`);
+
         if (imagePath && fs.existsSync(imagePath)) {
+          console.log(`📱 [Orders] Attempting sendMedia to ${order.phone}`);
           sent = await whatsapp.sendMedia(order.phone, imagePath, clientMsg);
         }
 
         if (!sent) {
+          console.log(`📱 [Orders] Attempting sendMessage to ${order.phone}`);
           sent = await whatsapp.sendMessage(order.phone, clientMsg);
         }
+
+        console.log(`📱 [Orders] WhatsApp send outcome: ${sent ? 'SUCCESS' : 'FAILED'}`);
 
         // ✅ ila num li dkhl l'user (client) khate2 / ma siftech,
         // sift l'alerte l-admin b numéro li jaye mn settings.whatsapp_chat
