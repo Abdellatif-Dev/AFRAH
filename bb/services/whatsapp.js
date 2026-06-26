@@ -90,6 +90,15 @@ function init() {
   });
 }
 
+function formatJID(phone) {
+  if (phone.endsWith('@c.us')) return phone;
+  let cleaned = phone.replace(/[^0-9]/g, '');
+  if (cleaned.startsWith('0')) {
+    cleaned = '212' + cleaned.slice(1);
+  }
+  return `${cleaned}@c.us`;
+}
+
 async function sendMessage(phone, message) {
   if (!isReady || !client) {
     console.log('WhatsApp not ready. Cannot send message.');
@@ -97,10 +106,9 @@ async function sendMessage(phone, message) {
   }
 
   try {
-    const formatted = phone.startsWith('0') ? '212' + phone.slice(1) : phone;
-    const fullNumber = formatted.includes('@c.us') ? formatted : `${formatted}@c.us`;
+    const fullNumber = formatJID(phone);
     await client.sendMessage(fullNumber, message);
-    console.log(`WhatsApp message sent to ${phone}`);
+    console.log(`WhatsApp message sent to ${fullNumber}`);
     return true;
   } catch (err) {
     console.error('WhatsApp send error:', err.message);
@@ -116,10 +124,9 @@ async function sendMedia(phone, imagePath, caption) {
 
   try {
     const media = MessageMedia.fromFilePath(imagePath);
-    const formatted = phone.startsWith('0') ? '212' + phone.slice(1) : phone;
-    const fullNumber = formatted.includes('@c.us') ? formatted : `${formatted}@c.us`;
+    const fullNumber = formatJID(phone);
     await client.sendMessage(fullNumber, media, { caption });
-    console.log(`WhatsApp media sent to ${phone}`);
+    console.log(`WhatsApp media sent to ${fullNumber}`);
     return true;
   } catch (err) {
     console.error('WhatsApp send media error:', err.message);

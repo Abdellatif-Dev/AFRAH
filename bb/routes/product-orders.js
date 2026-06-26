@@ -34,26 +34,36 @@ router.post('/', (req, res) => {
   if (!customer_name || !phone) return res.status(400).json({ message: 'Customer name and phone are required' });
   if (!product_id) return res.status(400).json({ message: 'Product ID is required' });
 
-  const stmt = db.prepare('INSERT INTO product_orders (customer_name, phone, address, product_id, notes) VALUES (?, ?, ?, ?, ?)');
-  const info = stmt.run(customer_name, phone, address || '', product_id, notes || '');
-  const orderId = info.lastInsertRowid;
+  db.run('INSERT INTO product_orders (customer_name, phone, address, product_id, notes) VALUES (?, ?, ?, ?, ?)',
+    [customer_name, phone, address || '', product_id, notes || ''],
+    function (err) {
+      if (err) {
+        console.error('Error inserting product order:', err.message);
+        return res.status(500).json({ message: 'Server error' });
+      }
 
-  res.status(201).json({ id: orderId, message: 'Order created' });
+      const orderId = this.lastID;
 
-  db.get('SELECT title, image, price FROM products WHERE id = ?', [product_id], (err, product) => {
-    const productTitle = product?.title || 'Produit';
-    const productImage = product?.image || '';
-    const productPrice = product?.price || 0;
+      res.status(201).json({ id: orderId, message: 'Order created' });
 
-    db.get('SELECT admin_whatsapp, whatsapp_chat FROM settings WHERE id = 1', (err2, row) => {
-      const adminPhone = (row && row.admin_whatsapp) || '';
-      const settingsWhatsApp = (row && row.whatsapp_chat) || '';
+      db.get('SELECT title, image, price FROM products WHERE id = ?', [product_id], (err3, product) => {
+        if (err3 || !product) {
+          console.error('Error fetching product details:', err3?.message);
+          return;
+        }
+        const productTitle = product.title || 'Produit';
+        const productImage = product.image || '';
+        const productPrice = product.price || 0;
 
-      // ✅ LINKS JDIAD
-      const confirmLink = `${BASE_URL}/api/product-orders/${orderId}/confirm`;
-      const cancelLink = `${BASE_URL}/api/product-orders/${orderId}/cancel`;
+        db.get('SELECT admin_whatsapp, whatsapp_chat FROM settings WHERE id = 1', (err2, row) => {
+          const adminPhone = (row && row.admin_whatsapp) || '';
+          const settingsWhatsApp = (row && row.whatsapp_chat) || '';
 
-      const customerMsg = `✨ *AFRAH — MARIAGE & ÉVÉNEMENTS* ✨
+          // ✅ LINKS JDIAD
+          const confirmLink = `${BASE_URL}/api/product-orders/${orderId}/confirm`;
+          const cancelLink = `${BASE_URL}/api/product-orders/${orderId}/cancel`;
+
+          const customerMsg = `✨ *AFRAH — MARIAGE & ÉVÉNEMENTS* ✨
 ━━━━━━━━━━━━━━━━━━
 Bonjour *${customer_name}* 👋
 
@@ -75,7 +85,7 @@ Merci de nous avoir choisis ! 🤍
 
 _Afrah - Mariage & Événements_`;
 
-      const adminMsg = `🛍️ *Nouvelle commande produit #${orderId}*
+          const adminMsg = `🛍️ *Nouvelle commande produit #${orderId}*
 
 📦 *Produit :* ${productTitle}
 💰 *Prix :* ${productPrice} DH
@@ -88,32 +98,35 @@ _Afrah - Mariage & Événements_`;
 ✅ Confirmer : ${confirmLink}
 ❌ Annuler : ${cancelLink}`;
 
-      const imagePath = productImage ? path.join(__dirname, '..', 'uploads', 'products', productImage) : null;
-      const hasImage = productImage && fs.existsSync(imagePath);
+          const baseDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
+          const imagePath = productImage ? path.join(baseDir, 'uploads', 'products', productImage) : null;
+          const hasImage = productImage && fs.existsSync(imagePath);
 
-      const sendTo = (number, msg, img) => {
-        if (img) return whatsapp.sendMedia(number, img, msg);
-        return whatsapp.sendMessage(number, msg);
-      };
+          const sendTo = (number, msg, img) => {
+            if (img) return whatsapp.sendMedia(number, img, msg);
+            return whatsapp.sendMessage(number, msg);
+          };
 
-      sendTo(phone, customerMsg, hasImage ? imagePath : null).then(sent => {
-        // ✅ Ila num dial client ma mchatch, sift l settings.whatsapp_chat
-        if (!sent) {
-          const fallbackNumber = settingsWhatsApp.trim();
-          if (fallbackNumber) {
-            sendTo(fallbackNumber, adminMsg, hasImage ? imagePath : null)
-              .then(() => console.log(`✅ Product Order #${orderId}: Fallback sent to settings.whatsapp_chat`))
-              .catch(err => console.error('Fallback send error:', err));
-          } else {
-            console.error('⚠️ Product Order #' + orderId + ': No fallback number configured');
-          }
-        } else if (adminPhone) {
-          // Ila client wsel, sift l admin gha notification
-          sendTo(adminPhone, adminMsg, hasImage ? imagePath : null);
-        }
+          sendTo(phone, customerMsg, hasImage ? imagePath : null).then(sent => {
+            // ✅ Ila num dial client ma mchatch, sift l settings.whatsapp_chat
+            if (!sent) {
+              const fallbackNumber = settingsWhatsApp.trim();
+              if (fallbackNumber) {
+                sendTo(fallbackNumber, adminMsg, hasImage ? imagePath : null)
+                  .then(() => console.log(`✅ Product Order #${orderId}: Fallback sent to settings.whatsapp_chat`))
+                  .catch(err4 => console.error('Fallback send error:', err4));
+              } else {
+                console.error('⚠️ Product Order #' + orderId + ': No fallback number configured');
+              }
+            } else if (adminPhone) {
+              // Ila client wsel, sift l admin gha notification
+              sendTo(adminPhone, adminMsg, hasImage ? imagePath : null);
+            }
+          });
+        });
       });
-    });
-  });
+    }
+  );
 });
 
 // PUT — Update status (admin panel)
