@@ -100,36 +100,54 @@ function formatJID(phone) {
 }
 
 async function sendMessage(phone, message) {
+  console.log(`🔍 [WA-sendMessage] Called. isReady=${isReady}, client=${!!client}, phone="${phone}"`);
   if (!isReady || !client) {
-    console.log('WhatsApp not ready. Cannot send message.');
+    console.log('❌ [WA-sendMessage] WhatsApp NOT READY. Cannot send message.');
     return false;
   }
 
   try {
     const fullNumber = formatJID(phone);
-    await client.sendMessage(fullNumber, message);
-    console.log(`WhatsApp message sent to ${fullNumber}`);
+    console.log(`📲 [WA-sendMessage] Formatted JID: ${fullNumber}`);
+
+    // Check if number is registered on WhatsApp
+    try {
+      const isRegistered = await client.isRegisteredUser(fullNumber);
+      console.log(`📲 [WA-sendMessage] isRegisteredUser(${fullNumber}) = ${isRegistered}`);
+      if (!isRegistered) {
+        console.warn(`⚠️ [WA-sendMessage] Number ${fullNumber} is NOT registered on WhatsApp!`);
+      }
+    } catch (regErr) {
+      console.warn(`⚠️ [WA-sendMessage] Could not check registration: ${regErr.message}`);
+    }
+
+    const result = await client.sendMessage(fullNumber, message);
+    console.log(`✅ [WA-sendMessage] Message SENT to ${fullNumber}. Result ID: ${result?.id?._serialized || 'unknown'}`);
     return true;
   } catch (err) {
-    console.error('WhatsApp send error:', err.message);
+    console.error(`❌ [WA-sendMessage] FAILED to send to phone="${phone}":`, err.message);
+    console.error(`❌ [WA-sendMessage] Full error:`, err);
     return false;
   }
 }
 
 async function sendMedia(phone, imagePath, caption) {
+  console.log(`🔍 [WA-sendMedia] Called. isReady=${isReady}, client=${!!client}, phone="${phone}", imagePath="${imagePath}"`);
   if (!isReady || !client) {
-    console.log('WhatsApp not ready. Cannot send media.');
+    console.log('❌ [WA-sendMedia] WhatsApp NOT READY. Cannot send media.');
     return false;
   }
 
   try {
     const media = MessageMedia.fromFilePath(imagePath);
     const fullNumber = formatJID(phone);
+    console.log(`📲 [WA-sendMedia] Formatted JID: ${fullNumber}`);
     await client.sendMessage(fullNumber, media, { caption });
-    console.log(`WhatsApp media sent to ${fullNumber}`);
+    console.log(`✅ [WA-sendMedia] Media SENT to ${fullNumber}`);
     return true;
   } catch (err) {
-    console.error('WhatsApp send media error:', err.message);
+    console.error(`❌ [WA-sendMedia] FAILED to send to phone="${phone}":`, err.message);
+    console.error(`❌ [WA-sendMedia] Full error:`, err);
     return false;
   }
 }

@@ -86,6 +86,10 @@ app.use('/api/products', productRoutes);
 app.use('/api/product-orders', productOrderRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+app.get('/api/wa-status', (req, res) => {
+  const status = whatsapp.getStatus();
+  res.json({ whatsapp: status, timestamp: new Date().toISOString() });
+});
 
 // Serve frontend static files in production
 const frontendDist = path.join(__dirname, '../ff/dist');
