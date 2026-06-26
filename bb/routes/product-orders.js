@@ -10,21 +10,37 @@ const router = express.Router();
 // ⚠️ BDEL HADI B DOMAIN DIALK
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
 
-// GET — Kol l orders (m3a search)
+// GET — Kol l orders (m3a search + pagination + status filter)
 router.get('/', verifyToken, (req, res) => {
-  const { search } = req.query;
-  let sql = `SELECT po.*, p.title as product_title, p.price as product_price FROM product_orders po LEFT JOIN products p ON po.product_id = p.id`;
+  const { search, status } = req.query;
+  const page = parseInt(req.query.page) || 1;
+  const perPage = parseInt(req.query.per_page) || 8;
+  const offset = (page - 1) * perPage;
+
+  const conditions = [];
   const params = [];
 
   if (search) {
-    sql += ' WHERE po.customer_name LIKE ? OR po.phone LIKE ?';
+    conditions.push('(po.customer_name LIKE ? OR po.phone LIKE ?)');
     params.push(`%${search}%`, `%${search}%`);
   }
-  sql += ' ORDER BY po.created_at DESC';
+  if (status) {
+    conditions.push('po.status = ?');
+    params.push(status);
+  }
 
-  db.all(sql, params, (err, rows) => {
-    if (err) return res.status(500).json({ message: 'Server error' });
-    res.json(rows);
+  const whereClause = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
+
+  const countSql = `SELECT COUNT(*) as total FROM product_orders po${whereClause}`;
+  db.get(countSql, params, (errCount, countRow) => {
+    if (errCount) return res.status(500).json({ message: 'Server error' });
+
+    const total = countRow ? countRow.total : 0;
+    const dataSql = `SELECT po.*, p.title as product_title, p.price as product_price FROM product_orders po LEFT JOIN products p ON po.product_id = p.id${whereClause} ORDER BY po.created_at DESC LIMIT ? OFFSET ?`;
+    db.all(dataSql, [...params, perPage, offset], (err, rows) => {
+      if (err) return res.status(500).json({ message: 'Server error' });
+      res.json({ data: rows, total });
+    });
   });
 });
 
@@ -179,6 +195,7 @@ router.get('/:id/confirm', (req, res) => {
 
   db.run('UPDATE product_orders SET status = ? WHERE id = ?', ['confirmed', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
+    if (this.changes === 0) return res.status(404).send('Commande introuvable');
 
     db.get('SELECT * FROM product_orders WHERE id = ?', [id], async (err, order) => {
       if (order) {
@@ -278,6 +295,7 @@ router.get('/:id/cancel', (req, res) => {
 
   db.run('UPDATE product_orders SET status = ? WHERE id = ?', ['canceled', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
+    if (this.changes === 0) return res.status(404).send('Commande introuvable');
 
     db.get('SELECT * FROM product_orders WHERE id = ?', [id], async (err, order) => {
       if (order) {

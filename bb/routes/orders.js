@@ -221,6 +221,7 @@ router.get('/:id/confirm', (req, res) => {
 
   db.run('UPDATE orders SET status = ? WHERE id = ?', ['confirmed', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
+    if (this.changes === 0) return res.status(404).send('Commande introuvable');
 
     db.get('SELECT * FROM orders WHERE id = ?', [id], async (err, order) => {
       // Sifet confirmation msg l client
@@ -321,6 +322,7 @@ router.get('/:id/cancel', (req, res) => {
 
   db.run('UPDATE orders SET status = ? WHERE id = ?', ['canceled', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
+    if (this.changes === 0) return res.status(404).send('Commande introuvable');
 
     db.get('SELECT * FROM orders WHERE id = ?', [id], async (err, order) => {
       if (order) {
