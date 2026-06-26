@@ -2,8 +2,24 @@ const db = require('./db');
 const bcrypt = require('bcryptjs');
 
 function seed() {
-  console.log('🌱 Starting database seeding...');
+  // Check if data already exists — if yes, skip seeding
+  db.get('SELECT COUNT(*) as count FROM categories', [], (err, row) => {
+    if (err) {
+      console.error('❌ Seed check error:', err.message);
+      return;
+    }
 
+    if (row && row.count > 0) {
+      console.log('✅ Database already has data, skipping seed.');
+      return;
+    }
+
+    console.log('🌱 Starting database seeding (first time)...');
+    runSeed();
+  });
+}
+
+function runSeed() {
   db.serialize(() => {
     // ========== CATEGORIES ==========
     const categories = [
@@ -17,7 +33,7 @@ function seed() {
 
     categories.forEach(([title, image, description]) => {
       db.run(
-        `INSERT OR IGNORE INTO categories (title, image, description) VALUES (?, ?, ?)`,
+        `INSERT INTO categories (title, image, description) VALUES (?, ?, ?)`,
         [title, image, description]
       );
     });
@@ -34,7 +50,7 @@ function seed() {
 
     events.forEach(([category_id, title, image, address, description]) => {
       db.run(
-        `INSERT OR IGNORE INTO events (category_id, title, image, address, description) VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO events (category_id, title, image, address, description) VALUES (?, ?, ?, ?, ?)`,
         [category_id, title, image, address, description]
       );
     });
@@ -51,7 +67,7 @@ function seed() {
 
     packages.forEach(([category_id, title, price, image, description]) => {
       db.run(
-        `INSERT OR IGNORE INTO packages (category_id, title, price, image, description) VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO packages (category_id, title, price, image, description) VALUES (?, ?, ?, ?, ?)`,
         [category_id, title, price, image, description]
       );
     });
@@ -80,7 +96,7 @@ function seed() {
 
     packageItems.forEach(([package_id, item, type]) => {
       db.run(
-        `INSERT OR IGNORE INTO package_items (package_id, item, type) VALUES (?, ?, ?)`,
+        `INSERT INTO package_items (package_id, item, type) VALUES (?, ?, ?)`,
         [package_id, item, type]
       );
     });
@@ -96,7 +112,7 @@ function seed() {
 
     productCategories.forEach(([title, image, description]) => {
       db.run(
-        `INSERT OR IGNORE INTO product_categories (title, image, description) VALUES (?, ?, ?)`,
+        `INSERT INTO product_categories (title, image, description) VALUES (?, ?, ?)`,
         [title, image, description]
       );
     });
@@ -117,20 +133,10 @@ function seed() {
 
     products.forEach(([category_id, title, price, image, description]) => {
       db.run(
-        `INSERT OR IGNORE INTO products (category_id, title, price, image, description) VALUES (?, ?, ?, ?, ?)`,
+        `INSERT INTO products (category_id, title, price, image, description) VALUES (?, ?, ?, ?, ?)`,
         [category_id, title, price, image, description]
       );
     });
-
-    // ========== ORDERS (SAMPLE) ==========
-   
-
-    // ========== PRODUCT ORDERS (SAMPLE) ==========
-    
-
-    // ========== HERO SLIDES ==========
-    
-    
 
     // ========== SETTINGS (ALREADY IN DB.JS) ==========
     // Deja créé f db.js
@@ -139,4 +145,37 @@ function seed() {
   });
 }
 
-module.exports = { seed };
+/**
+ * Reset: delete all data from all tables then re-seed
+ */
+function resetAndSeed() {
+  return new Promise((resolve, reject) => {
+    console.log('🗑️ Resetting database...');
+    db.serialize(() => {
+      // Delete data in reverse dependency order
+      db.run('DELETE FROM package_items');
+      db.run('DELETE FROM product_orders');
+      db.run('DELETE FROM orders');
+      db.run('DELETE FROM products');
+      db.run('DELETE FROM product_categories');
+      db.run('DELETE FROM packages');
+      db.run('DELETE FROM events');
+      db.run('DELETE FROM event_media');
+      db.run('DELETE FROM categories');
+      db.run('DELETE FROM hero_slides');
+      db.run('DELETE FROM contacts');
+      // Reset auto-increment
+      db.run("DELETE FROM sqlite_sequence");
+
+      console.log('✅ All tables cleared.');
+
+      // Now re-seed
+      runSeed();
+
+      // Small delay to let seed finish
+      setTimeout(() => resolve(), 500);
+    });
+  });
+}
+
+module.exports = { seed, resetAndSeed };

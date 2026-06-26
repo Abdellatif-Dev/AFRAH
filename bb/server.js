@@ -60,6 +60,7 @@ const productRoutes = require('./routes/products');
 const productOrderRoutes = require('./routes/product-orders');
 const whatsappRoutes = require('./routes/whatsapp');
 const whatsapp = require('./services/whatsapp');
+const { verifyToken } = require('./middleware/auth');
 const { seed } = require('./config/seeder');
 
 const app = express();
@@ -89,6 +90,18 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/wa-status', (req, res) => {
   const status = whatsapp.getStatus();
   res.json({ whatsapp: status, timestamp: new Date().toISOString() });
+});
+
+// ✅ Reset database — msah kul data w 3awed seed mn jdid
+app.post('/api/reset-db', verifyToken, async (req, res) => {
+  try {
+    const { resetAndSeed } = require('./config/seeder');
+    await resetAndSeed();
+    res.json({ message: 'Database reset and re-seeded successfully' });
+  } catch (err) {
+    console.error('Reset error:', err);
+    res.status(500).json({ message: 'Failed to reset database' });
+  }
 });
 
 // Serve frontend static files in production
