@@ -16,6 +16,34 @@ try {
   }
 } catch {}
 
+// Copy uploads folder to persistent directory if persistent dir exists but target uploads does not
+const persistentDir = process.env.PERSISTENT_DIR;
+if (persistentDir) {
+  const defaultUploadsDir = path.join(__dirname, 'uploads');
+  const targetUploadsDir = path.join(persistentDir, 'uploads');
+  if (!fs.existsSync(targetUploadsDir) && fs.existsSync(defaultUploadsDir)) {
+    try {
+      const copyDirSync = (src, dest) => {
+        fs.mkdirSync(dest, { recursive: true });
+        const entries = fs.readdirSync(src, { withFileTypes: true });
+        for (const entry of entries) {
+          const srcPath = path.join(src, entry.name);
+          const destPath = path.join(dest, entry.name);
+          if (entry.isDirectory()) {
+            copyDirSync(srcPath, destPath);
+          } else {
+            fs.copyFileSync(srcPath, destPath);
+          }
+        }
+      };
+      copyDirSync(defaultUploadsDir, targetUploadsDir);
+      console.log('✅ Copied default uploads to persistent storage');
+    } catch (e) {
+      console.error('Failed to copy default uploads:', e.message);
+    }
+  }
+}
+
 const cors = require('cors');
 
 const authRoutes = require('./routes/auth');
@@ -40,7 +68,8 @@ seed();
 
 app.use(cors());
 app.use(express.json());
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const uploadsBase = process.env.PERSISTENT_DIR || __dirname;
+app.use('/uploads', express.static(path.join(uploadsBase, 'uploads')));
 
 app.use('/api/auth', authRoutes);
 app.use('/api/categories', categoryRoutes);
@@ -57,6 +86,16 @@ app.use('/api/products', productRoutes);
 app.use('/api/product-orders', productOrderRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
+
+// Serve frontend static files in production
+const frontendDist = path.join(__dirname, '../ff/dist');
+if (fs.existsSync(frontendDist)) {
+  console.log('Serving frontend from', frontendDist);
+  app.use(express.static(frontendDist));
+  app.get('*', (req, res) => {
+    res.sendFile(path.join(frontendDist, 'index.html'));
+  });
+}
 
 whatsapp.init();
 

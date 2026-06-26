@@ -18,7 +18,8 @@ const storage = multer.diskStorage({
     else if (type === 'logo') folder = 'uploads/settings';
     else if (type === 'product') folder = 'uploads/products';
 
-    const dir = path.join(__dirname, '..', folder);
+    const baseDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
+    const dir = path.join(baseDir, folder);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
     cb(null, dir);
   },
@@ -71,7 +72,8 @@ router.delete('/event-media/:id', verifyToken, (req, res) => {
     if (err || !media) return res.status(404).json({ message: 'Media not found' });
 
     const folder = media.type === 'video' ? 'videos' : 'events';
-    const filePath = path.join(__dirname, '..', 'uploads', folder, media.file_name);
+    const baseDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
+    const filePath = path.join(baseDir, 'uploads', folder, media.file_name);
     fs.unlink(filePath, () => {});
 
     db.run('DELETE FROM event_media WHERE id = ?', [req.params.id], function (err) {
@@ -84,7 +86,9 @@ router.delete('/event-media/:id', verifyToken, (req, res) => {
 router.delete('/file', verifyToken, (req, res) => {
   const { filePath } = req.body;
   if (!filePath) return res.status(400).json({ message: 'filePath required' });
-  const fullPath = path.join(__dirname, '..', filePath);
+  const baseDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
+  const cleanPath = filePath.replace(/^\/?uploads\//, 'uploads/');
+  const fullPath = path.join(baseDir, cleanPath);
   fs.unlink(fullPath, (err) => {
     if (err) return res.status(404).json({ message: 'File not found' });
     res.json({ message: 'File deleted successfully' });

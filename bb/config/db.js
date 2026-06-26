@@ -1,8 +1,28 @@
 const sqlite3 = require('sqlite3');
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
 
-const dbPath = path.join(__dirname, '..', 'database.sqlite');
+const persistentDir = process.env.PERSISTENT_DIR;
+const dbName = 'database.sqlite';
+const defaultDbPath = path.join(__dirname, '..', dbName);
+
+if (persistentDir) {
+  const targetDbPath = path.join(persistentDir, dbName);
+  if (!fs.existsSync(targetDbPath) && fs.existsSync(defaultDbPath)) {
+    try {
+      if (!fs.existsSync(persistentDir)) {
+        fs.mkdirSync(persistentDir, { recursive: true });
+      }
+      fs.copyFileSync(defaultDbPath, targetDbPath);
+      console.log('✅ Copied default database to persistent storage');
+    } catch (e) {
+      console.error('Failed to copy default database:', e.message);
+    }
+  }
+}
+
+const dbPath = persistentDir ? path.join(persistentDir, dbName) : defaultDbPath;
 const db = new sqlite3.Database(dbPath, (err) => {
   if (err) console.error('DB connection error:', err.message);
   else console.log('Connected to SQLite database');

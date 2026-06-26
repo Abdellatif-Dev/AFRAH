@@ -8,7 +8,7 @@ const whatsapp = require('../services/whatsapp');
 const router = express.Router();
 
 // ⚠️ BDEL HADI B DOMAIN DIALK
-const BASE_URL = env.BASE_URL || 'http://localhost:5000';
+const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
 
 router.post('/', (req, res) => {
   const { customer_name, phone, address, event_date, package_id, notes } = req.body;
@@ -77,8 +77,9 @@ _Afrah - Mariage & Événements_`;
 
         let sent = false;
 
+        const baseDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
         const imagePath = order.package_image
-          ? path.join(__dirname, '..', 'uploads', 'packages', order.package_image)
+          ? path.join(baseDir, 'uploads', 'packages', order.package_image)
           : null;
 
         if (imagePath && fs.existsSync(imagePath)) {

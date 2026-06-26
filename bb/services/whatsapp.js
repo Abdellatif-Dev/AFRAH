@@ -9,6 +9,10 @@ let isInitialized = false;
 
 // ✅ 7iyed l Chrome paths dial Windows
 function findChrome() {
+  if (process.env.PUPPETEER_EXECUTABLE_PATH) {
+    console.log('✅ Chrome found from PUPPETEER_EXECUTABLE_PATH:', process.env.PUPPETEER_EXECUTABLE_PATH);
+    return process.env.PUPPETEER_EXECUTABLE_PATH;
+  }
   const possiblePaths = [
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
@@ -50,9 +54,10 @@ function init() {
     puppeteerOptions.executablePath = chromePath;
   }
 
+  const persistentDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
   client = new Client({
     authStrategy: new LocalAuth({
-      dataPath: path.join(__dirname, '..', 'whatsapp-data')
+      dataPath: path.join(persistentDir, 'whatsapp-data')
     }),
     puppeteer: puppeteerOptions
   });
