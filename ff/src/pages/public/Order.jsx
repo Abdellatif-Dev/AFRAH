@@ -19,6 +19,7 @@ export default function Order() {
     notes: '',
   });
   const [submitting, setSubmitting] = useState(false);
+  const todayStr = new Date().toISOString().split('T')[0];
 
   useEffect(() => {
     Promise.all([
@@ -105,7 +106,7 @@ export default function Order() {
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Date de l'événement *</label>
                 <input name="event_date" type="date" value={form.event_date} onChange={handleChange}
-                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 focus:border-transparent transition-all" min="2020-01-01" />
+                  className="w-full px-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-400 focus:border-transparent transition-all" min={todayStr} />
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1.5">Forfait</label>

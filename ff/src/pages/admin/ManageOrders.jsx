@@ -228,9 +228,16 @@ export default function ManageOrders() {
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1.5 text-sm text-gray-600">
-                      <Package size={13} className="text-gray-300" />
-                      <span className="truncate max-w-[150px]">{order.package_title || '—'}</span>
+                      <Package size={13} className="text-gray-300 shrink-0" />
+                      <span className="truncate max-w-[150px] font-semibold text-gray-800">
+                        {order.package_title || (order.custom_items ? 'Forfait Personnalisé 🛠️' : '—')}
+                      </span>
                     </div>
+                    {order.custom_items && (
+                      <div className="text-[10px] text-amber-600 mt-1 max-w-[180px] truncate" title={order.custom_items}>
+                        {order.custom_items}
+                      </div>
+                    )}
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-1.5 text-sm text-gray-500">
@@ -321,10 +328,19 @@ export default function ManageOrders() {
               </div>
 
               <div className="mt-3 space-y-1.5">
-                {order.package_title && (
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <Package size={12} className="text-gray-300" />
-                    <span className="truncate">{order.package_title}</span>
+                {(order.package_title || order.custom_items) && (
+                  <div className="flex items-start gap-2 text-xs text-gray-500">
+                    <Package size={12} className="text-gray-300 mt-0.5 shrink-0" />
+                    <div>
+                      <span className="font-semibold text-gray-800">
+                        {order.package_title || 'Forfait Personnalisé 🛠️'}
+                      </span>
+                      {order.custom_items && (
+                        <div className="text-[10px] text-amber-600 mt-0.5 break-words">
+                          {order.custom_items}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 )}
                 {order.event_date && (
