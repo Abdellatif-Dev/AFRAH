@@ -6,14 +6,21 @@ let client = null;
 let qrCode = null;
 let isReady = false;
 let isInitialized = false;
+let healthCheckInterval = null;
 
-// ✅ 7iyed l Chrome paths dial Windows
+// ✅ 7iyed l Chrome paths dial Windows + Linux (Railway/Docker kayjbdo Linux, machi Windows!)
 function findChrome() {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
     console.log('✅ Chrome found from PUPPETEER_EXECUTABLE_PATH:', process.env.PUPPETEER_EXECUTABLE_PATH);
     return process.env.PUPPETEER_EXECUTABLE_PATH;
   }
   const possiblePaths = [
+    // Linux (Railway / Docker)
+    '/usr/bin/google-chrome-stable',
+    '/usr/bin/google-chrome',
+    '/usr/bin/chromium-browser',
+    '/usr/bin/chromium',
+    // Windows (dev local)
     'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe',
     'C:\\Users\\' + process.env.USERNAME + '\\AppData\\Local\\Google\\Chrome\\Application\\chrome.exe',
@@ -28,14 +35,20 @@ function findChrome() {
     }
   }
 
-  // Ila ma l9ach, 3awed jareb b chromium
-  const puppeteerCache = path.join(process.env.LOCALAPPDATA || '', '.cache', 'puppeteer');
-  if (fs.existsSync(puppeteerCache)) {
-    console.log('🔍 Searching in puppeteer cache:', puppeteerCache);
-  }
-
-  console.log('❌ Chrome not found. Please install Google Chrome.');
+  console.log('❌ Chrome not found at known paths. Puppeteer will try its bundled Chromium if available.');
   return null;
+}
+
+// ✅ FIX: wrapper li kay-limiter l wa9t li kayms7ab feh wa7ed promise.
+// Hada howa l mochkil li tchowf f logs dyalk: l command kayb9a "hanging" b la jamais
+// resolve/reject mnin l browser ykon matt. B hadi, ghadi treject manuellement men b3d X ms.
+function withTimeout(promise, ms, label = 'operation') {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    )
+  ]);
 }
 
 function init() {
@@ -46,17 +59,24 @@ function init() {
 
   const puppeteerOptions = {
     headless: true,
-    protocolTimeout: 300000, // 5 min
+    protocolTimeout: 60000, // ✅ FIX: kan 5min, daba 60s bach ma tbqa commande "hanging" bzaf wa9t
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-extensions'
+      '--disable-extensions',
+      '--disable-accelerated-2d-canvas',
+      '--no-zygote',
+      '--disable-background-networking',
+      '--disable-default-apps',
+      '--disable-translate',
+      '--disable-sync',
+      '--metrics-recording-only',
+      '--mute-audio',
     ]
   };
 
-  // Ila l9ina Chrome, zid l executablePath
   if (chromePath) {
     puppeteerOptions.executablePath = chromePath;
   }
@@ -82,8 +102,37 @@ function init() {
     await new Promise(resolve => setTimeout(resolve, 10000));
 
     isReady = true;
-
     console.log('✅ WhatsApp fully initialized.');
+
+    // ✅ FIX: hada howa l vrai mochkil dyalk -> mnin Chrome ykrach (OOM 3la Railway ghalban),
+    // l 'client' object kayb9a f mémoire ready=true, walakin l browser process matt mn taht.
+    // L event 'disconnected' dyal whatsapp-web.js machi dima kaytfir f had l7ala,
+    // donc khassna nesta3mlo l listener direct dyal puppeteer browser.
+    try {
+      const pupBrowser = client.pupBrowser;
+      if (pupBrowser) {
+        pupBrowser.on('disconnected', () => {
+          console.log('💥 Puppeteer browser disconnected/crashed unexpectedly! Restarting WhatsApp client...');
+          isReady = false;
+          restart();
+        });
+      }
+    } catch (e) {
+      console.warn('⚠️ Could not attach pupBrowser disconnected listener:', e.message);
+    }
+
+    // ✅ FIX: health-check khfif kol 2 d9ay9 bach n3rfo wakha l browser mazal 7ay
+    if (healthCheckInterval) clearInterval(healthCheckInterval);
+    healthCheckInterval = setInterval(async () => {
+      if (!isReady || !client) return;
+      try {
+        await withTimeout(client.getState(), 15000, 'health-check getState');
+      } catch (err) {
+        console.error('💥 [Health-check] WhatsApp client looks stuck/dead:', err.message);
+        isReady = false;
+        restart();
+      }
+    }, 2 * 60 * 1000);
   });
 
   client.on('disconnected', () => {
@@ -122,9 +171,8 @@ async function sendMessage(phone, message) {
     const fullNumber = formatJID(phone);
     console.log(`📲 [WA-sendMessage] Formatted JID: ${fullNumber}`);
 
-    // Check if number is registered on WhatsApp
     try {
-      const isRegistered = await client.isRegisteredUser(fullNumber);
+      const isRegistered = await withTimeout(client.isRegisteredUser(fullNumber), 20000, 'isRegisteredUser');
       console.log(`📲 [WA-sendMessage] isRegisteredUser(${fullNumber}) = ${isRegistered}`);
       if (!isRegistered) {
         console.warn(`⚠️ [WA-sendMessage] Number ${fullNumber} is NOT registered on WhatsApp!`);
@@ -133,12 +181,17 @@ async function sendMessage(phone, message) {
       console.warn(`⚠️ [WA-sendMessage] Could not check registration: ${regErr.message}`);
     }
 
-    const result = await client.sendMessage(fullNumber, message);
+    const result = await withTimeout(client.sendMessage(fullNumber, message), 30000, 'sendMessage');
     console.log(`✅ [WA-sendMessage] Message SENT to ${fullNumber}. Result ID: ${result?.id?._serialized || 'unknown'}`);
     return true;
   } catch (err) {
     console.error(`❌ [WA-sendMessage] FAILED to send to phone="${phone}":`, err.message);
-    console.error(`❌ [WA-sendMessage] Full error:`, err);
+    // ✅ FIX: ila kan timeout, ghaleban l browser matt -> restart direct bach next try ykon nadi
+    if (String(err.message).includes('timed out')) {
+      console.error('💥 [WA-sendMessage] Timeout detected -> browser probably dead. Restarting client...');
+      isReady = false;
+      restart();
+    }
     return false;
   }
 }
@@ -154,7 +207,7 @@ async function sendMedia(phone, imagePath, caption) {
   try {
     const fullNumber = formatJID(phone);
 
-    console.log("📍 State:", await client.getState());
+    console.log("📍 State:", await withTimeout(client.getState(), 15000, 'getState'));
     console.log("📍 Image exists:", fs.existsSync(imagePath));
 
     if (!fs.existsSync(imagePath)) {
@@ -168,15 +221,21 @@ async function sendMedia(phone, imagePath, caption) {
     console.log("📍 Media created");
 
     console.log("📍 Sending...");
-    const result = await client.sendMessage(fullNumber, media, { caption });
+    const result = await withTimeout(client.sendMessage(fullNumber, media, { caption }), 45000, 'sendMedia');
 
-    console.log("📍 Result:", result);
+    console.log("📍 Result:", result?.id?._serialized || result);
     console.log("✅ Media SENT");
 
     return true;
 
   } catch (err) {
-    console.error("❌ Error:", err);
+    console.error("❌ Error:", err.message);
+    // ✅ FIX: same logic -> ila timeout, restart bach next try ykon b browser jdid
+    if (String(err.message).includes('timed out')) {
+      console.error('💥 [WA-sendMedia] Timeout detected -> browser probably dead. Restarting client...');
+      isReady = false;
+      restart();
+    }
     return false;
   }
 }
@@ -190,6 +249,10 @@ function getStatus() {
 }
 
 async function restart() {
+  if (healthCheckInterval) {
+    clearInterval(healthCheckInterval);
+    healthCheckInterval = null;
+  }
   if (client) {
     try { await client.destroy(); } catch (e) { }
   }
