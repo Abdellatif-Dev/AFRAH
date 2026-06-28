@@ -57,17 +57,21 @@ function withTimeout(promise, ms, label = 'operation') {
 // kaykhdmou b nafs l profil. Ila l process l9dim matt b chakl sale (crash/OOM/kill),
 // had les fichiers kayb9aw hia hia f l volume persistent, w Chrome jdid kayrfod ywalla.
 function cleanupChromeLocks(dir) {
-  try {
-    const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
-    for (const f of lockFiles) {
-      const fp = path.join(dir, f);
-      if (fs.existsSync(fp)) {
-        fs.unlinkSync(fp);
-        console.log(`🧹 Removed stale Chrome lock file: ${fp}`);
+  const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+  for (const f of lockFiles) {
+    const fp = path.join(dir, f);
+    try {
+      // ✅ FIX: SingletonLock howa symlink li target dyalo "hostname-pid" (machi fichier 7a9i9i).
+      // fs.existsSync() katb3a l symlink w kat-rja3 false ila target ma kaynch -> kant kat-skip
+      // l lock b sukout bla ma t7iydo! unlinkSync kay7iyed l link nafso, machi target dyalo.
+      fs.unlinkSync(fp);
+      console.log(`🧹 Removed stale Chrome lock file: ${fp}`);
+    } catch (e) {
+      if (e.code !== 'ENOENT') {
+        console.warn(`⚠️ Could not remove lock file ${fp}:`, e.code || e.message);
       }
+      // ENOENT = ma kanch kayn, normal, walou ma3andou
     }
-  } catch (e) {
-    console.warn('⚠️ Could not clean Chrome lock files:', e.message);
   }
 }
 
