@@ -59,15 +59,17 @@ function init() {
 
   const puppeteerOptions = {
     headless: true,
-    protocolTimeout: 60000, // ✅ FIX: kan 5min, daba 60s bach ma tbqa commande "hanging" bzaf wa9t
+    protocolTimeout: 60000,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
+      '--disable-dev-shm-usage', // كتحمي من كراش الذاكرة المؤقتة
       '--disable-gpu',
       '--disable-extensions',
       '--disable-accelerated-2d-canvas',
       '--no-zygote',
+      '--single-process', // 👈 هادي ضرووووورية فـ Railway باش ينقص الرام
+      '--js-flags="--max-old-space-size=256"', // 👈 هادي كتمنع Chrome ياكل كثر من 256MB
       '--disable-background-networking',
       '--disable-default-apps',
       '--disable-translate',
@@ -207,7 +209,9 @@ async function sendMedia(phone, imagePath, caption) {
   try {
     const fullNumber = formatJID(phone);
 
-    console.log("📍 State:", await withTimeout(client.getState(), 15000, 'getState'));
+    // ❌ حيدنا client.getState() حيت كيعمر الرام وكيسبب بلوكاج فـ Railway
+    // console.log("📍 State:", await withTimeout(client.getState(), 15000, 'getState'));
+
     console.log("📍 Image exists:", fs.existsSync(imagePath));
 
     if (!fs.existsSync(imagePath)) {
@@ -223,14 +227,13 @@ async function sendMedia(phone, imagePath, caption) {
     console.log("📍 Sending...");
     const result = await withTimeout(client.sendMessage(fullNumber, media, { caption }), 45000, 'sendMedia');
 
-    console.log("📍 Result:", result?.id?._serialized || result);
+    console.log("📍 Result:", result?.id?._serialized || "SENT");
     console.log("✅ Media SENT");
 
     return true;
 
   } catch (err) {
-    console.error("❌ Error:", err.message);
-    // ✅ FIX: same logic -> ila timeout, restart bach next try ykon b browser jdid
+    console.error("❌ Error in sendMedia:", err.message);
     if (String(err.message).includes('timed out')) {
       console.error('💥 [WA-sendMedia] Timeout detected -> browser probably dead. Restarting client...');
       isReady = false;
