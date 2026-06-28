@@ -111,34 +111,43 @@ function formatJID(phone) {
   return `${cleaned}@c.us`;
 }
 
-async function sendMessage(phone, message) {
-  console.log(`🔍 [WA-sendMessage] Called. isReady=${isReady}, client=${!!client}, phone="${phone}"`);
+async function sendMedia(phone, imagePath, caption) {
+  console.log(`🔍 [WA-sendMedia] Called. isReady=${isReady}, client=${!!client}, phone="${phone}", imagePath="${imagePath}"`);
+
   if (!isReady || !client) {
-    console.log('❌ [WA-sendMessage] WhatsApp NOT READY. Cannot send message.');
+    console.log('❌ [WA-sendMedia] WhatsApp NOT READY.');
     return false;
   }
 
   try {
     const fullNumber = formatJID(phone);
-    console.log(`📲 [WA-sendMessage] Formatted JID: ${fullNumber}`);
 
-    // Check if number is registered on WhatsApp
-    try {
-      const isRegistered = await client.isRegisteredUser(fullNumber);
-      console.log(`📲 [WA-sendMessage] isRegisteredUser(${fullNumber}) = ${isRegistered}`);
-      if (!isRegistered) {
-        console.warn(`⚠️ [WA-sendMessage] Number ${fullNumber} is NOT registered on WhatsApp!`);
-      }
-    } catch (regErr) {
-      console.warn(`⚠️ [WA-sendMessage] Could not check registration: ${regErr.message}`);
+    console.log("📍 State:", await client.getState());
+
+    console.log("📍 Image exists:", fs.existsSync(imagePath));
+
+    if (!fs.existsSync(imagePath)) {
+      console.log("❌ Image not found");
+      return false;
     }
 
-    const result = await client.sendMessage(fullNumber, message);
-    console.log(`✅ [WA-sendMessage] Message SENT to ${fullNumber}. Result ID: ${result?.id?._serialized || 'unknown'}`);
+    const stat = fs.statSync(imagePath);
+    console.log("📍 Image size:", stat.size);
+
+    const media = MessageMedia.fromFilePath(imagePath);
+
+    console.log("📍 Media created");
+
+    console.log("📍 Sending to:", fullNumber);
+
+    await client.sendMessage(fullNumber, media, { caption });
+
+    console.log("✅ Message sent");
+
     return true;
+
   } catch (err) {
-    console.error(`❌ [WA-sendMessage] FAILED to send to phone="${phone}":`, err.message);
-    console.error(`❌ [WA-sendMessage] Full error:`, err);
+    console.error(err);
     return false;
   }
 }
