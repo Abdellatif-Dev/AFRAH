@@ -8,6 +8,9 @@ let isReady = false;
 let isInitialized = false;
 let healthCheckInterval = null;
 
+const persistentDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
+const sessionDir = path.join(persistentDir, 'whatsapp-data', 'session');
+
 // ✅ 7iyed l Chrome paths dial Windows + Linux (Railway/Docker kayjbdo Linux, machi Windows!)
 function findChrome() {
   if (process.env.PUPPETEER_EXECUTABLE_PATH) {
@@ -39,9 +42,7 @@ function findChrome() {
   return null;
 }
 
-// ✅ FIX: wrapper li kay-limiter l wa9t li kayms7ab feh wa7ed promise.
-// Hada howa l mochkil li tchowf f logs dyalk: l command kayb9a "hanging" b la jamais
-// resolve/reject mnin l browser ykon matt. B hadi, ghadi treject manuellement men b3d X ms.
+// ✅ wrapper li kay-limiter l wa9t li kayms7ab feh wa7ed promise (bach ma tbqach "hanging" l blassa)
 function withTimeout(promise, ms, label = 'operation') {
   return Promise.race([
     promise,
@@ -51,32 +52,54 @@ function withTimeout(promise, ms, label = 'operation') {
   ]);
 }
 
+// ✅ NEW FIX: hadi l vrai cause dial "Code: 21 / profile appears to be in use".
+// Chrome kayskhli SingletonLock/Cookie/Socket f l profile dir bach ma ykonch 2 process
+// kaykhdmou b nafs l profil. Ila l process l9dim matt b chakl sale (crash/OOM/kill),
+// had les fichiers kayb9aw hia hia f l volume persistent, w Chrome jdid kayrfod ywalla.
+function cleanupChromeLocks(dir) {
+  try {
+    const lockFiles = ['SingletonLock', 'SingletonCookie', 'SingletonSocket'];
+    for (const f of lockFiles) {
+      const fp = path.join(dir, f);
+      if (fs.existsSync(fp)) {
+        fs.unlinkSync(fp);
+        console.log(`🧹 Removed stale Chrome lock file: ${fp}`);
+      }
+    }
+  } catch (e) {
+    console.warn('⚠️ Could not clean Chrome lock files:', e.message);
+  }
+}
+
 function init() {
   if (isInitialized) return;
   isInitialized = true;
+
+  // ✅ NEW FIX: nmsa7o l locks 9bel ma n7awlo nl-launchiw Chrome, chaque fois
+  cleanupChromeLocks(sessionDir);
 
   const chromePath = findChrome();
 
   const puppeteerOptions = {
     headless: true,
-    protocolTimeout: 90000, // ✅ FIX: 60s -> 90s, bach initial sync li b9at slow ma tfeshelch b force
+    protocolTimeout: 90000, // bach initial sync li b9at slow ma tfeshelch b force
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
+      '--disable-dev-shm-usage', // كتحمي من كراش الذاكرة المؤقتة
       '--disable-gpu',
       '--disable-extensions',
       '--disable-accelerated-2d-canvas',
       '--no-zygote',
+      '--single-process', // 👈 ضرووووورية فـ Railway باش ينقص الرام (خاصها restart نظيف، شفتي تحت)
+      '--js-flags=--max-old-space-size=256', // ✅ FIX: 7iydna les quotes l zaydin (machi --js-flags="...") li kanou kaytrejmou ka partie men literal string
       '--disable-background-networking',
       '--disable-default-apps',
       '--disable-translate',
       '--disable-sync',
       '--metrics-recording-only',
       '--mute-audio',
-      // ✅ FIX: hadi l vrai cause dial "Runtime.callFunctionOn timed out" -> Chrome
-      // kay-throttle l tab f background (7ta f headless), w l timers/polling dial
-      // WhatsApp Web kaybdaw bti'in m3a l wa9t hta l page katb9a frozen.
+      // ✅ Re-added: kay-mn3o Chrome mn ma-throttle l timers/polling dial WhatsApp Web f background
       '--disable-background-timer-throttling',
       '--disable-backgrounding-occluded-windows',
       '--disable-renderer-backgrounding',
@@ -88,7 +111,6 @@ function init() {
     puppeteerOptions.executablePath = chromePath;
   }
 
-  const persistentDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
   client = new Client({
     authStrategy: new LocalAuth({
       dataPath: path.join(persistentDir, 'whatsapp-data')
@@ -106,9 +128,7 @@ function init() {
     console.log('✅ WhatsApp client is ready!');
     qrCode = null;
 
-    // ✅ FIX: bdal sleep fixe dyal 10s, kan-poll getState() l ghaya ywsel 'CONNECTED'.
-    // WhatsApp Web kaydowwez sync kbira (chats/contacts) mnin l session, w f environment
-    // b CPU limité hadshi b9adr ykhod bzaf wa9t -> 10s ma kafyin walou f had l7ala.
+    // ✅ Re-added: kan-poll getState() l ghaya ywsel 'CONNECTED' bdal sleep fixe dyal 10s
     console.log('⏳ Warming up... waiting for WhatsApp page to become fully responsive...');
     const warmupStart = Date.now();
     const warmupMaxMs = 5 * 60 * 1000; // 5 d9ay9 max
@@ -136,10 +156,9 @@ function init() {
     isReady = true;
     console.log('✅ WhatsApp fully initialized.');
 
-    // ✅ FIX: hada howa l vrai mochkil dyalk -> mnin Chrome ykrach (OOM 3la Railway ghalban),
-    // l 'client' object kayb9a f mémoire ready=true, walakin l browser process matt mn taht.
-    // L event 'disconnected' dyal whatsapp-web.js machi dima kaytfir f had l7ala,
-    // donc khassna nesta3mlo l listener direct dyal puppeteer browser.
+    // mnin Chrome ykrach (OOM/single-process crash ghalban), l 'client' object kayb9a f mémoire
+    // ready=true, walakin l browser process matt mn taht. L event 'disconnected' dyal
+    // whatsapp-web.js machi dima kaytfir f had l7ala, donc khassna l listener direct dyal puppeteer.
     try {
       const pupBrowser = client.pupBrowser;
       if (pupBrowser) {
@@ -153,7 +172,7 @@ function init() {
       console.warn('⚠️ Could not attach pupBrowser disconnected listener:', e.message);
     }
 
-    // ✅ FIX: health-check khfif kol 2 d9ay9 bach n3rfo wakha l browser mazal 7ay
+    // health-check khfif kol 2 d9ay9 bach n3rfo wakha l browser mazal 7ay
     if (healthCheckInterval) clearInterval(healthCheckInterval);
     healthCheckInterval = setInterval(async () => {
       if (!isReady || !client) return;
@@ -180,6 +199,14 @@ function init() {
   client.initialize().catch(err => {
     console.error('WhatsApp initialization error:', err.message);
     isInitialized = false;
+
+    // ✅ NEW FIX: ila l error houwa b sabab profile lock, nmsa7o w n3awdo n7awlo automatiquement
+    const msg = String(err.message || '');
+    if (msg.includes('profile appears to be in use') || msg.includes('SingletonLock') || msg.includes('Failed to launch')) {
+      console.log('🧹 Detected Chrome profile-lock / launch issue. Cleaning locks and retrying in 3s...');
+      cleanupChromeLocks(sessionDir);
+      setTimeout(init, 3000);
+    }
   });
 }
 
@@ -218,7 +245,6 @@ async function sendMessage(phone, message) {
     return true;
   } catch (err) {
     console.error(`❌ [WA-sendMessage] FAILED to send to phone="${phone}":`, err.message);
-    // ✅ FIX: ila kan timeout, ghaleban l browser matt -> restart direct bach next try ykon nadi
     if (String(err.message).includes('timed out')) {
       console.error('💥 [WA-sendMessage] Timeout detected -> browser probably dead. Restarting client...');
       isReady = false;
@@ -239,7 +265,9 @@ async function sendMedia(phone, imagePath, caption) {
   try {
     const fullNumber = formatJID(phone);
 
-    console.log("📍 State:", await withTimeout(client.getState(), 15000, 'getState'));
+    // حيدنا client.getState() من هنا (كانت كتكرر بلوكاج فـ Railway) — health-check
+    // فالأعلى كافي بحالها لمراقبة الـ browser.
+
     console.log("📍 Image exists:", fs.existsSync(imagePath));
 
     if (!fs.existsSync(imagePath)) {
@@ -255,14 +283,13 @@ async function sendMedia(phone, imagePath, caption) {
     console.log("📍 Sending...");
     const result = await withTimeout(client.sendMessage(fullNumber, media, { caption }), 45000, 'sendMedia');
 
-    console.log("📍 Result:", result?.id?._serialized || result);
+    console.log("📍 Result:", result?.id?._serialized || "SENT");
     console.log("✅ Media SENT");
 
     return true;
 
   } catch (err) {
-    console.error("❌ Error:", err.message);
-    // ✅ FIX: same logic -> ila timeout, restart bach next try ykon b browser jdid
+    console.error("❌ Error in sendMedia:", err.message);
     if (String(err.message).includes('timed out')) {
       console.error('💥 [WA-sendMedia] Timeout detected -> browser probably dead. Restarting client...');
       isReady = false;
@@ -285,13 +312,31 @@ async function restart() {
     clearInterval(healthCheckInterval);
     healthCheckInterval = null;
   }
+
   if (client) {
-    try { await client.destroy(); } catch (e) { }
+    try {
+      // ✅ NEW FIX: ila destroy() kaytsanna bla nihaya (l page matt/single-process crashed),
+      // n3tiwha ghi 10s w b3dha nforce-kill l process bach ma ytsannach l ate3 server.
+      await withTimeout(client.destroy(), 10000, 'client.destroy');
+    } catch (e) {
+      console.warn('⚠️ client.destroy() failed/timed out, force-killing browser process:', e.message);
+      try {
+        const proc = client?.pupBrowser?.process();
+        if (proc) proc.kill('SIGKILL');
+      } catch (killErr) {
+        console.warn('⚠️ Could not force-kill browser process:', killErr.message);
+      }
+    }
   }
+
   isInitialized = false;
   isReady = false;
   qrCode = null;
   client = null;
+
+  // ✅ NEW FIX: nmsa7o l locks 9bel ma n3awdo nbdaw, bach ma tbqach "profile in use"
+  cleanupChromeLocks(sessionDir);
+
   setTimeout(init, 1000);
 }
 
