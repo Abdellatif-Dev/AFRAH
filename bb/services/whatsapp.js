@@ -59,23 +59,28 @@ function init() {
 
   const puppeteerOptions = {
     headless: true,
-    protocolTimeout: 60000,
+    protocolTimeout: 90000, // ✅ FIX: 60s -> 90s, bach initial sync li b9at slow ma tfeshelch b force
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage', // كتحمي من كراش الذاكرة المؤقتة
+      '--disable-dev-shm-usage',
       '--disable-gpu',
       '--disable-extensions',
       '--disable-accelerated-2d-canvas',
       '--no-zygote',
-      '--single-process', // 👈 هادي ضرووووورية فـ Railway باش ينقص الرام
-      '--js-flags="--max-old-space-size=256"', // 👈 هادي كتمنع Chrome ياكل كثر من 256MB
       '--disable-background-networking',
       '--disable-default-apps',
       '--disable-translate',
       '--disable-sync',
       '--metrics-recording-only',
       '--mute-audio',
+      // ✅ FIX: hadi l vrai cause dial "Runtime.callFunctionOn timed out" -> Chrome
+      // kay-throttle l tab f background (7ta f headless), w l timers/polling dial
+      // WhatsApp Web kaybdaw bti'in m3a l wa9t hta l page katb9a frozen.
+      '--disable-background-timer-throttling',
+      '--disable-backgrounding-occluded-windows',
+      '--disable-renderer-backgrounding',
+      '--disable-ipc-flooding-protection',
     ]
   };
 
@@ -101,7 +106,32 @@ function init() {
     console.log('✅ WhatsApp client is ready!');
     qrCode = null;
 
-    await new Promise(resolve => setTimeout(resolve, 10000));
+    // ✅ FIX: bdal sleep fixe dyal 10s, kan-poll getState() l ghaya ywsel 'CONNECTED'.
+    // WhatsApp Web kaydowwez sync kbira (chats/contacts) mnin l session, w f environment
+    // b CPU limité hadshi b9adr ykhod bzaf wa9t -> 10s ma kafyin walou f had l7ala.
+    console.log('⏳ Warming up... waiting for WhatsApp page to become fully responsive...');
+    const warmupStart = Date.now();
+    const warmupMaxMs = 5 * 60 * 1000; // 5 d9ay9 max
+    let warmedUp = false;
+    while (Date.now() - warmupStart < warmupMaxMs) {
+      try {
+        const state = await withTimeout(client.getState(), 20000, 'warmup getState');
+        console.log(`📍 [Warmup] getState() = ${state} (${Math.round((Date.now() - warmupStart) / 1000)}s elapsed)`);
+        if (state === 'CONNECTED') {
+          warmedUp = true;
+          break;
+        }
+      } catch (err) {
+        console.warn(`⚠️ [Warmup] getState() failed/timed out: ${err.message}. Retrying...`);
+      }
+      await new Promise(r => setTimeout(r, 3000));
+    }
+
+    if (!warmedUp) {
+      console.warn(`⚠️ [Warmup] Timed out after ${warmupMaxMs / 1000}s — marking ready anyway, but page might still be unstable.`);
+    } else {
+      console.log(`✅ [Warmup] Page is responsive (took ${Math.round((Date.now() - warmupStart) / 1000)}s).`);
+    }
 
     isReady = true;
     console.log('✅ WhatsApp fully initialized.');
@@ -209,9 +239,7 @@ async function sendMedia(phone, imagePath, caption) {
   try {
     const fullNumber = formatJID(phone);
 
-    // ❌ حيدنا client.getState() حيت كيعمر الرام وكيسبب بلوكاج فـ Railway
-    // console.log("📍 State:", await withTimeout(client.getState(), 15000, 'getState'));
-
+    console.log("📍 State:", await withTimeout(client.getState(), 15000, 'getState'));
     console.log("📍 Image exists:", fs.existsSync(imagePath));
 
     if (!fs.existsSync(imagePath)) {
@@ -227,13 +255,14 @@ async function sendMedia(phone, imagePath, caption) {
     console.log("📍 Sending...");
     const result = await withTimeout(client.sendMessage(fullNumber, media, { caption }), 45000, 'sendMedia');
 
-    console.log("📍 Result:", result?.id?._serialized || "SENT");
+    console.log("📍 Result:", result?.id?._serialized || result);
     console.log("✅ Media SENT");
 
     return true;
 
   } catch (err) {
-    console.error("❌ Error in sendMedia:", err.message);
+    console.error("❌ Error:", err.message);
+    // ✅ FIX: same logic -> ila timeout, restart bach next try ykon b browser jdid
     if (String(err.message).includes('timed out')) {
       console.error('💥 [WA-sendMedia] Timeout detected -> browser probably dead. Restarting client...');
       isReady = false;
