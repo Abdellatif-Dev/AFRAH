@@ -46,7 +46,14 @@ function init() {
 
   const puppeteerOptions = {
     headless: true,
-    args: ['--no-sandbox', '--disable-setuid-sandbox']
+    protocolTimeout: 300000, // 5 min
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-gpu',
+      '--disable-extensions'
+    ]
   };
 
   // Ila l9ina Chrome, zid l executablePath
@@ -68,10 +75,15 @@ function init() {
     console.log('📱 WhatsApp QR code generated. Scan with your phone.');
   });
 
-  client.on('ready', () => {
-    isReady = true;
-    qrCode = null;
+  client.on('ready', async () => {
     console.log('✅ WhatsApp client is ready!');
+    qrCode = null;
+
+    await new Promise(resolve => setTimeout(resolve, 10000));
+
+    isReady = true;
+
+    console.log('✅ WhatsApp fully initialized.');
   });
 
   client.on('disconnected', () => {
@@ -162,7 +174,7 @@ function getStatus() {
 
 async function restart() {
   if (client) {
-    try { await client.destroy(); } catch (e) {}
+    try { await client.destroy(); } catch (e) { }
   }
   isInitialized = false;
   isReady = false;

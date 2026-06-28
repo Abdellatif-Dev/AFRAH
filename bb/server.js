@@ -61,11 +61,11 @@ const productOrderRoutes = require('./routes/product-orders');
 const whatsappRoutes = require('./routes/whatsapp');
 const whatsapp = require('./services/whatsapp');
 const { verifyToken } = require('./middleware/auth');
-const { seed } = require('./config/seeder');
+//const { seed } = require('./config/seeder');
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-seed();
+//seed();
 
 app.use(cors());
 app.use(express.json());
