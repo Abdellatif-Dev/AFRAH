@@ -75,12 +75,12 @@ router.post('/', (req, res) => {
           const adminPhone = (row && row.admin_whatsapp) || '';
           const settingsWhatsApp = (row && row.whatsapp_chat) || '';
 
-          // ✅ LINKS JDIAD
-          const confirmLink = `${BASE_URL}/api/product-orders/${orderId}/confirm`;
-          const cancelLink = `${BASE_URL}/api/product-orders/${orderId}/cancel`;
+          // ✅ LINKS JDIAD — b accepte / refuse
+          const acceptLink = `${BASE_URL}/api/product-orders/${orderId}/accept`;
+          const refuseLink = `${BASE_URL}/api/product-orders/${orderId}/refuse`;
 
           const customerMsg = `✨ *AFRAH — MARIAGE & ÉVÉNEMENTS* ✨
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 Bonjour *${customer_name}* 👋
 
 Nous avons bien reçu votre commande pour :
@@ -88,14 +88,14 @@ Nous avons bien reçu votre commande pour :
 📦 *${productTitle}*
 💰 *Prix :* ${productPrice} DH
 
-━━━━━━━━━━━━━━━━━━
+━━━━━━━━━━━━━━━━
 👉 *Veuillez choisir une option :*
 
-✅ *Confirmer la commande :*
-${confirmLink}
+✅ *Accepter la commande :*
+${acceptLink}
 
-❌ *Annuler la commande :*
-${cancelLink}
+❌ *Refuser la commande :*
+${refuseLink}
 
 Merci de nous avoir choisis ! 🤍
 
@@ -111,8 +111,8 @@ _Afrah - Mariage & Événements_`;
 📝 *Notes :* ${notes || 'Aucune'}
 
 👉 *Liens rapides :*
-✅ Confirmer : ${confirmLink}
-❌ Annuler : ${cancelLink}`;
+✅ Accepter : ${acceptLink}
+❌ Refuser : ${refuseLink}`;
 
           const baseDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
           const imagePath = productImage ? path.join(baseDir, 'uploads', 'products', productImage) : null;
@@ -148,23 +148,22 @@ _Afrah - Mariage & Événements_`;
 // PUT — Update status (admin panel)
 router.put('/:id', verifyToken, (req, res) => {
   const { status } = req.body;
-  if (!['pending', 'confirmed', 'canceled'].includes(status)) return res.status(400).json({ message: 'Invalid status' });
+  if (!['pending', 'accepte', 'refuse'].includes(status)) return res.status(400).json({ message: 'Invalid status' });
   db.run('UPDATE product_orders SET status = ? WHERE id = ?', [status, req.params.id], function (err) {
     if (err) return res.status(500).json({ message: 'Server error' });
     if (!this.changes) return res.status(404).json({ message: 'Not found' });
     res.json({ message: 'Order updated' });
 
-    // ✅ Sifet notification l client ila tbdel status
-    if (status === 'confirmed' || status === 'canceled') {
+    if (status === 'accepte' || status === 'refuse') {
       db.get('SELECT * FROM product_orders WHERE id = ?', [req.params.id], async (err, order) => {
         if (err || !order) return;
 
-        if (status === 'confirmed') {
-          const msg = `✅ *Commande confirmée — #${order.id}*
+        if (status === 'accepte') {
+          const msg = `✅ *Commande acceptée — #${order.id}*
 
 Bonjour *${order.customer_name}* 👋
 
-Excellente nouvelle ! Votre commande est désormais *confirmée* 🎉
+Excellente nouvelle ! Votre commande a été *acceptée* 🎉
 
 Notre équipe vous contactera bientôt pour les derniers détails. À très vite ✨
 
@@ -172,12 +171,12 @@ _Afrah - Mariage & Événements_`;
           await whatsapp.sendMessage(order.phone, msg);
         }
 
-        if (status === 'canceled') {
+        if (status === 'refuse') {
           const msg = `❌ *Concernant votre commande #${order.id}*
 
 Bonjour *${order.customer_name}*,
 
-Nous sommes désolés, votre commande n'a pas pu être confirmée cette fois-ci.
+Nous sommes désolés, votre commande n'a pas pu être acceptée cette fois-ci.
 
 N'hésitez pas à nous contacter pour plus d'informations 🤍
 
@@ -189,21 +188,21 @@ _Afrah - Mariage & Événements_`;
   });
 });
 
-// ✅ ROUTE JDIAD — Confirmer b link
-router.get('/:id/confirm', (req, res) => {
+// ✅ ROUTE JDIAD — Accepter b link
+router.get('/:id/accept', (req, res) => {
   const id = parseInt(req.params.id, 10);
 
-  db.run('UPDATE product_orders SET status = ? WHERE id = ?', ['confirmed', id], function (err) {
+  db.run('UPDATE product_orders SET status = ? WHERE id = ?', ['accepte', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
     if (this.changes === 0) return res.status(404).send('Commande introuvable');
 
     db.get('SELECT * FROM product_orders WHERE id = ?', [id], async (err, order) => {
       if (order) {
-        const msg = `✅ *Commande confirmée — #${order.id}*
+        const msg = `✅ *Commande acceptée — #${order.id}*
 
 Bonjour *${order.customer_name}* 👋
 
-Votre commande a été *confirmée* avec succès ! 🎉
+Votre commande a été *acceptée* avec succès ! 🎉
 
 Notre équipe vous contactera bientôt pour les derniers détails. À très vite ✨
 
@@ -218,7 +217,7 @@ _Afrah - Mariage & Événements_`;
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>✅ Commande Confirmée — AfraH</title>
+        <title>✅ Commande Acceptée — AfraH</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body {
@@ -277,7 +276,7 @@ _Afrah - Mariage & Événements_`;
       <body>
         <div class="card">
           <div class="icon">✅</div>
-          <h1>Commande Confirmée !</h1>
+          <h1>Commande Acceptée !</h1>
           <div class="order-id">Commande #${id}</div>
           <p>Votre commande a été confirmée avec succès.</p>
           <p>Notre équipe vous contactera très prochainement pour finaliser les détails.</p>
@@ -289,21 +288,21 @@ _Afrah - Mariage & Événements_`;
   });
 });
 
-// ✅ ROUTE JDIAD — Annuler b link
-router.get('/:id/cancel', (req, res) => {
+// ✅ ROUTE JDIAD — Refuser b link
+router.get('/:id/refuse', (req, res) => {
   const id = parseInt(req.params.id, 10);
 
-  db.run('UPDATE product_orders SET status = ? WHERE id = ?', ['canceled', id], function (err) {
+  db.run('UPDATE product_orders SET status = ? WHERE id = ?', ['refuse', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
     if (this.changes === 0) return res.status(404).send('Commande introuvable');
 
     db.get('SELECT * FROM product_orders WHERE id = ?', [id], async (err, order) => {
       if (order) {
-        const msg = `❌ *Commande annulée — #${order.id}*
+        const msg = `❌ *Commande refusée — #${order.id}*
 
 Bonjour *${order.customer_name}*,
 
-Votre commande a été *annulée*.
+Votre commande a été *refusée*.
 
 N'hésitez pas à nous contacter pour plus d'informations ou pour découvrir d'autres options 🤍
 
@@ -318,7 +317,7 @@ _Afrah - Mariage & Événements_`;
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>❌ Commande Annulée — AfraH</title>
+        <title>❌ Commande Refusée — AfraH</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body {
@@ -377,9 +376,9 @@ _Afrah - Mariage & Événements_`;
       <body>
         <div class="card">
           <div class="icon">❌</div>
-          <h1>Commande Annulée</h1>
+          <h1>Commande Refusée</h1>
           <div class="order-id">Commande #${id}</div>
-          <p>Votre commande a été annulée.</p>
+          <p>Votre commande a été refusée.</p>
           <p>N'hésitez pas à nous contacter pour découvrir d'autres options.</p>
           <div class="footer">Afrah — Mariage & Événements 💫</div>
         </div>

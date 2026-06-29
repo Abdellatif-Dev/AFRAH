@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { toast } from 'react-toastify';
-import { Smartphone, RefreshCw, Loader2 } from 'lucide-react';
+import { Smartphone, RefreshCw, Loader2, Calendar } from 'lucide-react';
 import API from '../../api/axios';
 
 export default function WhatsAppSetup() {
@@ -8,6 +8,7 @@ export default function WhatsAppSetup() {
   const [qrData, setQrData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [adminPhone, setAdminPhone] = useState('');
+  const [calConnected, setCalConnected] = useState(false);
   const polling = useRef(null);
 
   const fetchQr = async () => {
@@ -38,6 +39,7 @@ export default function WhatsAppSetup() {
 
   useEffect(() => {
     API.get('/settings').then(r => setAdminPhone(r.data?.admin_whatsapp || '')).catch(() => {});
+    API.get('/calendar/status').then(r => setCalConnected(r.data?.connected || false)).catch(() => {});
     fetchStatus();
     polling.current = setInterval(fetchStatus, 5000);
     return () => { if (polling.current) clearInterval(polling.current); };
@@ -115,6 +117,25 @@ export default function WhatsAppSetup() {
           <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2"><Smartphone size={16} /> Notification de commande produit</h3>
           <p className="text-xs text-gray-500">1. Un message de confirmation est envoyé au <strong>numéro du client</strong>.</p>
           <p className="text-xs text-gray-500">2. Si le client n'a pas WhatsApp, la notification vous est envoyée au <strong>{adminPhone || 'numéro admin (configurez dans Paramètres → WhatsApp)'}</strong>.</p>
+        </div>
+
+        {/* Google Calendar */}
+        <div className="border-t pt-4 space-y-3">
+          <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2"><Calendar size={16} /> Google Calendar</h3>
+          {calConnected ? (
+            <div className="bg-green-50 rounded-xl p-4 text-sm space-y-1">
+              <p className="text-green-700 font-medium flex items-center gap-2">✅ Calendrier connecté</p>
+              <p className="text-green-600 text-xs">Les événements seront automatiquement ajoutés au calendrier quand une réservation reçoit une avance.</p>
+            </div>
+          ) : (
+            <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
+              <p className="text-gray-500">Connectez votre Google Calendar pour synchroniser les réservations.</p>
+              <a href="http://localhost:5000/api/calendar/auth"
+                className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium py-2.5 px-5 rounded-full transition-all">
+                <Calendar size={15} /> Connecter Google Calendar
+              </a>
+            </div>
+          )}
         </div>
       </div>
     </div>

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import API from '../../api/axios';
 import PackageCard from '../../components/PackageCard';
 import LoadingSpinner from '../../components/LoadingSpinner';
@@ -17,6 +18,66 @@ function prepareCarousel(items = []) {
 // duration kif kbra l-liste, ymchi b lentitude tabt
 function carouselDuration(count) {
   return `${Math.max(18, count * 4)}s`;
+}
+
+// ===== Mobile: pack b pack, kol pack yb9a INTERVAL_MS w 3andha les boutons </> =====
+function PackSlideshow({ items, intervalMs = 5000 }) {
+  const [idx, setIdx] = useState(0);
+
+  useEffect(() => {
+    if (items.length <= 1) return;
+    const timer = setInterval(() => {
+      setIdx(prev => (prev + 1) % items.length);
+    }, intervalMs);
+    return () => clearInterval(timer);
+  }, [items.length, intervalMs, idx]);
+
+  if (items.length === 0) return null;
+
+  const goPrev = () => setIdx(prev => (prev - 1 + items.length) % items.length);
+  const goNext = () => setIdx(prev => (prev + 1) % items.length);
+
+  return (
+    <div className="relative px-4">
+      <div className="overflow-hidden">
+        <div
+          className="flex transition-transform duration-500 ease-out"
+          style={{ transform: `translateX(-${idx * 100}%)` }}
+        >
+          {items.map((pkg, i) => (
+            <div key={`${pkg.id}-${i}`} className="w-full flex-shrink-0 px-1">
+              <PackageCard pkg={pkg} />
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {items.length > 1 && (
+        <>
+          <button
+            onClick={goPrev}
+            aria-label="Précédent"
+            className="absolute left-1 top-1/2 -translate-y-1/2 bg-white shadow-md rounded-full p-2 text-gray-700 hover:text-gold-600 z-10"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            onClick={goNext}
+            aria-label="Suivant"
+            className="absolute right-1 top-1/2 -translate-y-1/2 bg-white shadow-md rounded-full p-2 text-gray-700 hover:text-gold-600 z-10"
+          >
+            <ChevronRight size={18} />
+          </button>
+
+          <div className="flex justify-center gap-1.5 mt-4">
+            {items.map((_, i) => (
+              <span key={i} className={`h-1.5 rounded-full transition-all ${i === idx ? 'bg-gold-400 w-5' : 'bg-gray-300 w-1.5'}`} />
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
 }
 
 export default function Home() {
@@ -78,9 +139,16 @@ export default function Home() {
     });
   }
 
+  // ===== Pack Mariage: carousel mkhasas ghir l categorie "Mariage" =====
+  const mariageCategoryIds = categories
+    .filter(c => (c.title || '').toLowerCase().includes('mariage'))
+    .map(c => c.id);
+  const mariagePackages = packages.filter(p => mariageCategoryIds.includes(p.category_id));
+
   const catCarousel = prepareCarousel(categories);
   const prodCarousel = prepareCarousel(products);
   const pkgCarousel = prepareCarousel(displayedPackages);
+  const mariageCarousel = prepareCarousel(mariagePackages);
 
   // classe commune l item width (4 visibles f desktop, 3 f tablet, 2 f mobile)
   const ITEM_WIDTH = 'flex-shrink-0 w-[78%] sm:w-[47%] md:w-[31%] lg:w-[23%]';
@@ -101,9 +169,12 @@ export default function Home() {
         {slides.map((slide, i) => (
           <div key={slide.id}
             className={`absolute inset-0 transition-all duration-1000 ${i === slideIndex ? 'opacity-100 scale-100' : 'opacity-0 scale-105'}`}>
-            <img src={`/uploads/slides/${slide.image}`} alt=""
-              className="w-full h-full object-cover"
-              fetchpriority={i === 0 ? 'high' : 'low'} />
+            <picture>
+              <source media="(max-width: 768px)" srcSet={`/uploads/slides/${slide.image_mobile}`} />
+              <img src={`/uploads/slides/${slide.image}`} alt=""
+                className="w-full h-full object-cover"
+                fetchpriority={i === 0 ? 'high' : 'low'} />
+            </picture>
           </div>
         ))}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent" />
@@ -115,6 +186,37 @@ export default function Home() {
           ))}
         </div>
       </section>
+
+      {/* ========== PACK MARIAGE (carousel mkhasas, taht hero) ========== */}
+      {mariageCarousel.items.length > 0 && (
+        <section className="py-20 sm:py-28 bg-white">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div className="text-center max-w-xl mx-auto mb-14">
+              <span className="text-xs font-semibold text-gold-600 uppercase tracking-[0.2em]">Tarifs</span>
+              <h2 className="text-3xl sm:text-4xl font-display font-bold text-gray-900 mt-3">Nos Forfaits Mariage</h2>
+              <div className="w-10 h-0.5 bg-gold-400 mx-auto mt-4 rounded-full" />
+              <p className="text-sm text-gray-400 mt-3">Nos meilleures offres pour votre grand jour</p>
+            </div>
+
+            <div className="sm:hidden">
+              <PackSlideshow items={mariageCarousel.items} />
+            </div>
+
+            <div className="hidden sm:block relative overflow-hidden -mx-4 sm:-mx-6 lg:-mx-8">
+              <div
+                className={`flex gap-6 px-4 sm:px-6 lg:px-8 ${mariageCarousel.rotate ? 'carousel-track' : 'flex-wrap justify-center'}`}
+                style={mariageCarousel.rotate ? { animation: `infiniteCarousel ${carouselDuration(mariageCarousel.items.length)} linear infinite` } : undefined}
+              >
+                {(mariageCarousel.rotate ? mariageCarousel.items.concat(mariageCarousel.items) : mariageCarousel.items).map((pkg, i) => (
+                  <div key={`mariage-${pkg.id}-${i}`} className={ITEM_WIDTH}>
+                    <PackageCard pkg={pkg} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       <section className="py-20 sm:py-28 bg-[#fafafa]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -264,18 +366,24 @@ export default function Home() {
           {pkgCarousel.items.length === 0 ? (
             <p className="text-center text-gray-300">Aucun forfait disponible pour le moment.</p>
           ) : (
-            <div className="relative overflow-hidden -mx-4 sm:-mx-6 lg:-mx-8">
-              <div
-                className={`flex gap-6 px-4 sm:px-6 lg:px-8 ${pkgCarousel.rotate ? 'carousel-track' : 'flex-wrap justify-center'}`}
-                style={pkgCarousel.rotate ? { animation: `infiniteCarousel ${carouselDuration(pkgCarousel.items.length)} linear infinite` } : undefined}
-              >
-                {(pkgCarousel.rotate ? pkgCarousel.items.concat(pkgCarousel.items) : pkgCarousel.items).map((pkg, i) => (
-                  <div key={`${pkg.id}-${i}`} className={ITEM_WIDTH}>
-                    <PackageCard pkg={pkg} />
-                  </div>
-                ))}
+            <>
+              <div className="sm:hidden">
+                <PackSlideshow items={pkgCarousel.items} />
               </div>
-            </div>
+
+              <div className="hidden sm:block relative overflow-hidden -mx-4 sm:-mx-6 lg:-mx-8">
+                <div
+                  className={`flex gap-6 px-4 sm:px-6 lg:px-8 ${pkgCarousel.rotate ? 'carousel-track' : 'flex-wrap justify-center'}`}
+                  style={pkgCarousel.rotate ? { animation: `infiniteCarousel ${carouselDuration(pkgCarousel.items.length)} linear infinite` } : undefined}
+                >
+                  {(pkgCarousel.rotate ? pkgCarousel.items.concat(pkgCarousel.items) : pkgCarousel.items).map((pkg, i) => (
+                    <div key={`${pkg.id}-${i}`} className={ITEM_WIDTH}>
+                      <PackageCard pkg={pkg} />
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </>
           )}
         </div>
       </section>

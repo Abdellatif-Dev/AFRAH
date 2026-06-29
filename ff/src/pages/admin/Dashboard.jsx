@@ -75,8 +75,13 @@ function BarChart({ data, color = '#667eea', height = 120 }) {
 function StatusBadge({ status }) {
   const map = {
     pending:   { bg: 'bg-amber-50', text: 'text-amber-700', label: 'En attente' },
+    avance:    { bg: 'bg-blue-50', text: 'text-blue-700', label: 'Avance' },
     confirmed: { bg: 'bg-emerald-50', text: 'text-emerald-700', label: 'Confirmée' },
+    kamel:     { bg: 'bg-green-50', text: 'text-green-700', label: 'Payé (Kamel)' },
+    termini:   { bg: 'bg-indigo-50', text: 'text-indigo-700', label: 'Terminée' },
     canceled:  { bg: 'bg-rose-50', text: 'text-rose-700', label: 'Annulée' },
+    accepte:   { bg: 'bg-emerald-50', text: 'text-emerald-700', label: 'Acceptée' },
+    refuse:    { bg: 'bg-rose-50', text: 'text-rose-700', label: 'Refusée' },
   };
   const s = map[status] || map.pending;
   return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${s.bg} ${s.text}`}>{s.label}</span>;
@@ -87,8 +92,8 @@ export default function Dashboard() {
     events: 0, packages: 0, orders: 0, productOrders: 0,
     products: 0, contacts: 0, categories: 0, productCategories: 0,
   });
-  const [orderStatus, setOrderStatus] = useState({ pending: 0, confirmed: 0, canceled: 0 });
-  const [productOrderStatus, setProductOrderStatus] = useState({ pending: 0, confirmed: 0, canceled: 0 });
+  const [orderStatus, setOrderStatus] = useState({ pending: 0, avance: 0, confirmed: 0, kamel: 0, termini: 0, canceled: 0 });
+  const [productOrderStatus, setProductOrderStatus] = useState({ pending: 0, accepte: 0, refuse: 0 });
   const [recentOrders, setRecentOrders] = useState([]);
   const [recentProductOrders, setRecentProductOrders] = useState([]);
   const [recentContacts, setRecentContacts] = useState([]);
@@ -124,14 +129,15 @@ export default function Dashboard() {
         const allOrders = ord.data.orders || [];
         const allProductOrders = pOrd.data || [];
 
-        const countStatus = (arr) => ({
-          pending: arr.filter(o => o.status === 'pending').length,
-          confirmed: arr.filter(o => o.status === 'confirmed').length,
-          canceled: arr.filter(o => o.status === 'canceled').length,
-        });
+        const countStatus = (arr, statuses) => {
+          const result = {};
+          statuses.forEach(s => result[s] = 0);
+          arr.forEach(o => { if (statuses.includes(o.status)) result[o.status]++; });
+          return result;
+        };
 
-        setOrderStatus(countStatus(allOrders));
-        setProductOrderStatus(countStatus(allProductOrders));
+        setOrderStatus(countStatus(allOrders, ['pending', 'avance', 'confirmed', 'kamel', 'termini', 'canceled']));
+        setProductOrderStatus(countStatus(allProductOrders, ['pending', 'accepte', 'refuse']));
 
         // 3. Recent items (last 5)
         setRecentOrders((ord.data.orders || []).slice(0, 5));
@@ -238,17 +244,20 @@ export default function Dashboard() {
 
   const orderDonutData = [
     { value: orderStatus.pending, label: 'En attente' },
+    { value: orderStatus.avance, label: 'Avance' },
     { value: orderStatus.confirmed, label: 'Confirmées' },
+    { value: orderStatus.kamel, label: 'Payé' },
+    { value: orderStatus.termini, label: 'Terminées' },
     { value: orderStatus.canceled, label: 'Annulées' },
   ];
 
   const productDonutData = [
     { value: productOrderStatus.pending, label: 'En attente' },
-    { value: productOrderStatus.confirmed, label: 'Confirmées' },
-    { value: productOrderStatus.canceled, label: 'Annulées' },
+    { value: productOrderStatus.accepte, label: 'Acceptées' },
+    { value: productOrderStatus.refuse, label: 'Refusées' },
   ];
 
-  const donutColors = ['#f59e0b', '#10b981', '#ef4444'];
+  const donutColors = ['#f59e0b', '#3b82f6', '#10b981', '#22c55e', '#6366f1', '#ef4444'];
 
   return (
     <div className="space-y-8">

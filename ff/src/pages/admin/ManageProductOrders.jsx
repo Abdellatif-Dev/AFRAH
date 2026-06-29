@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { toast } from 'react-toastify';
-import { Search, Check, X, Clock, Trash2, ShoppingCart, PackageCheck, PackageX, PackageSearch, ChevronLeft, ChevronRight, Filter, Eye, Calendar, Phone, MapPin, User } from 'lucide-react';
+import { Search, Check, X, Clock, Trash2, ShoppingCart, PackageSearch, ChevronLeft, ChevronRight, Filter, Eye, Calendar, Phone, MapPin, User } from 'lucide-react';
 import API from '../../api/axios';
 import ConfirmModal from '../../components/ConfirmModal';
 
@@ -11,16 +11,16 @@ const statusConfig = {
     label: 'En attente',
     dot: 'bg-amber-400'
   },
-  confirmed: { 
+  accepte: { 
     style: 'bg-emerald-50 text-emerald-700 border-emerald-200', 
     icon: Check, 
-    label: 'Confirmée',
+    label: 'Acceptée',
     dot: 'bg-emerald-400'
   },
-  canceled: { 
+  refuse: { 
     style: 'bg-red-50 text-red-700 border-red-200', 
     icon: X, 
-    label: 'Annulée',
+    label: 'Refusée',
     dot: 'bg-red-400'
   },
 };
@@ -116,8 +116,8 @@ export default function ManageProductOrders() {
   const stats = {
     total: totalItems,
     pending: orders.filter(o => o.status === 'pending').length,
-    confirmed: orders.filter(o => o.status === 'confirmed').length,
-    canceled: orders.filter(o => o.status === 'canceled').length,
+    accepte: orders.filter(o => o.status === 'accepte').length,
+    refuse: orders.filter(o => o.status === 'refuse').length,
   };
 
   // Pagination calc
@@ -183,17 +183,17 @@ export default function ManageProductOrders() {
             <PackageCheck className="w-5 h-5 text-emerald-600" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-gray-900">{stats.confirmed}</p>
-            <p className="text-xs text-gray-500">Confirmées</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.accepte}</p>
+            <p className="text-xs text-gray-500">Acceptées</p>
           </div>
         </div>
         <div className="bg-white rounded-2xl p-4 shadow-sm border border-gray-100 flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-red-50 flex items-center justify-center">
-            <PackageX className="w-5 h-5 text-red-600" />
+            <X className="w-5 h-5 text-red-600" />
           </div>
           <div>
-            <p className="text-2xl font-bold text-gray-900">{stats.canceled}</p>
-            <p className="text-xs text-gray-500">Annulées</p>
+            <p className="text-2xl font-bold text-gray-900">{stats.refuse}</p>
+            <p className="text-xs text-gray-500">Refusées</p>
           </div>
         </div>
       </div>
@@ -225,8 +225,8 @@ export default function ManageProductOrders() {
               >
                 <option value="">Tous les statuts</option>
                 <option value="pending">En attente</option>
-                <option value="confirmed">Confirmée</option>
-                <option value="canceled">Annulée</option>
+                <option value="accepte">Acceptée</option>
+                <option value="refuse">Refusée</option>
               </select>
             </div>
           </div>
@@ -304,21 +304,21 @@ export default function ManageProductOrders() {
                           >
                             <Eye size={15} />
                           </button>
-                          {o.status !== 'confirmed' && (
-                            <button 
-                              onClick={() => updateStatus(o.id, 'confirmed')}
-                              className="flex items-center gap-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium px-3 py-1.5 rounded-lg transition-all"
-                            >
-                              <Check size={12} /> Confirmer
-                            </button>
-                          )}
-                          {o.status !== 'canceled' && (
-                            <button 
-                              onClick={() => updateStatus(o.id, 'canceled')}
-                              className="flex items-center gap-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 font-medium px-3 py-1.5 rounded-lg transition-all"
-                            >
-                              <X size={12} /> Annuler
-                            </button>
+                          {o.status === 'pending' && (
+                            <>
+                              <button 
+                                onClick={() => updateStatus(o.id, 'accepte')}
+                                className="flex items-center gap-1 text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium px-3 py-1.5 rounded-lg transition-all"
+                              >
+                                <Check size={12} /> Accepter
+                              </button>
+                              <button 
+                                onClick={() => updateStatus(o.id, 'refuse')}
+                                className="flex items-center gap-1 text-xs bg-red-50 hover:bg-red-100 text-red-600 font-medium px-3 py-1.5 rounded-lg transition-all"
+                              >
+                                <X size={12} /> Refuser
+                              </button>
+                            </>
                           )}
                           <button 
                             onClick={() => setDeleteTarget(o.id)} 
@@ -459,21 +459,21 @@ export default function ManageProductOrders() {
             </div>
 
             <div className="flex gap-2 mt-6 pt-4 border-t border-gray-100">
-              {selectedOrder.status !== 'confirmed' && (
-                <button 
-                  onClick={() => { updateStatus(selectedOrder.id, 'confirmed'); setSelectedOrder(null); }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium rounded-xl transition-all"
-                >
-                  <Check size={14} /> Confirmer
-                </button>
-              )}
-              {selectedOrder.status !== 'canceled' && (
-                <button 
-                  onClick={() => { updateStatus(selectedOrder.id, 'canceled'); setSelectedOrder(null); }}
-                  className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-xl transition-all"
-                >
-                  <X size={14} /> Annuler
-                </button>
+              {selectedOrder.status === 'pending' && (
+                <>
+                  <button 
+                    onClick={() => { updateStatus(selectedOrder.id, 'accepte'); setSelectedOrder(null); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-medium rounded-xl transition-all"
+                  >
+                    <Check size={14} /> Accepter
+                  </button>
+                  <button 
+                    onClick={() => { updateStatus(selectedOrder.id, 'refuse'); setSelectedOrder(null); }}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2.5 text-sm bg-red-50 hover:bg-red-100 text-red-600 font-medium rounded-xl transition-all"
+                  >
+                    <X size={14} /> Refuser
+                  </button>
+                </>
               )}
             </div>
           </div>

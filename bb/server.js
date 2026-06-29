@@ -1,3 +1,5 @@
+//require('dotenv').config();
+require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
@@ -61,6 +63,7 @@ const productOrderRoutes = require('./routes/product-orders');
 const whatsappRoutes = require('./routes/whatsapp');
 const whatsapp = require('./services/whatsapp');
 const { verifyToken } = require('./middleware/auth');
+const googleCalendarRoutes = require('./routes/google-calendar');
 //const { seed } = require('./config/seeder');
 
 const app = express();
@@ -85,6 +88,7 @@ app.use('/api/whatsapp', whatsappRoutes);
 app.use('/api/product-categories', productCategoryRoutes);
 app.use('/api/products', productRoutes);
 app.use('/api/product-orders', productOrderRoutes);
+app.use('/api/calendar', googleCalendarRoutes);
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/wa-status', (req, res) => {

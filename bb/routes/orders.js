@@ -12,14 +12,14 @@ const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
 
 router.post('/', (req, res) => {
   console.log('📩 [Orders] Received package order request:', req.body);
-  const { customer_name, phone, address, event_date, package_id, notes } = req.body;
+  const { customer_name, phone, address, event_date, package_id, notes, custom_items } = req.body;
   if (!customer_name || !phone) {
     console.warn('⚠️ [Orders] Missing required fields:', { customer_name, phone });
     return res.status(400).json({ message: 'Name and phone are required' });
   }
 
-  db.run('INSERT INTO orders (customer_name, phone, address, event_date, package_id, notes) VALUES (?, ?, ?, ?, ?, ?)',
-    [customer_name, phone, address || '', event_date || '', package_id || null, notes || ''],
+  db.run('INSERT INTO orders (customer_name, phone, address, event_date, package_id, notes, custom_items) VALUES (?, ?, ?, ?, ?, ?, ?)',
+    [customer_name, phone, address || '', event_date || '', package_id || null, notes || '', custom_items || ''],
     function (err) {
       if (err) {
         console.error('❌ [Orders] Database insertion error:', err.message);
@@ -51,6 +51,11 @@ router.post('/', (req, res) => {
         const confirmLink = `${BASE_URL}/api/orders/${order.id}/confirm`;
         const cancelLink = `${BASE_URL}/api/orders/${order.id}/cancel`;
 
+        const forfaitDisplay = order.package_title || (order.custom_items ? 'Forfait Personnalisé 🛠️' : 'Non spécifié');
+        const customItemsDisplay = order.custom_items 
+          ? `🛍️ Éléments :\n${order.custom_items.split(', ').map(item => `  • ${item}`).join('\n')}\n━━━━━━━━━━━━━━━━━━\n`
+          : '';
+
         const clientMsg = `✨ *AFRAH — MARIAGE & ÉVÉNEMENTS* ✨
 ━━━━━━━━━━━━━━━━━━
 Bonjour *${order.customer_name}* 👋
@@ -60,8 +65,8 @@ Nous avons bien reçu votre demande de réservation. Merci infiniment pour votre
 🧾 *Récapitulatif*
 ━━━━━━━━━━━━━━━━━━
 🔖 Commande : *#${order.id}*
-📦 Forfait : *${order.package_title || 'Non spécifié'}*
-📅 Date événement : *${order.event_date || 'À confirmer'}*
+📦 Forfait : *${forfaitDisplay}*
+${customItemsDisplay}📅 Date événement : *${order.event_date || 'À confirmer'}*
 ━━━━━━━━━━━━━━━━━━
 
 ⏳ *Statut :* En attente de confirmation
@@ -81,8 +86,8 @@ _Afrah - Mariage & Événements_`;
 📞 *Téléphone :* ${order.phone}
 📍 *Adresse :* ${order.address || 'Non renseignée'}
 📅 *Date :* ${order.event_date || 'Non spécifiée'}
-📦 *Forfait :* ${order.package_title || 'Non spécifié'}
-📝 *Notes :* ${order.notes || 'Aucune'}
+📦 *Forfait :* ${forfaitDisplay}
+${order.custom_items ? `🛍️ Éléments :\n${order.custom_items.split(', ').map(item => `  • ${item}`).join('\n')}\n` : ''}📝 *Notes :* ${order.notes || 'Aucune'}
 🕐 *Date commande :* ${order.created_at?.slice(0, 16) || ''}
 
 👉 *Liens rapides :*
@@ -170,18 +175,54 @@ router.get('/', verifyToken, (req, res) => {
 });
 
 router.put('/:id', verifyToken, (req, res) => {
-  const { status } = req.body;
-  if (!['pending', 'confirmed', 'canceled'].includes(status)) {
+  const { status, advance_price } = req.body;
+  const validStatuses = ['pending', 'avance', 'confirmed', 'kamel', 'termini', 'canceled'];
+  if (!validStatuses.includes(status)) {
     return res.status(400).json({ message: 'Invalid status' });
   }
 
-  db.run('UPDATE orders SET status = ? WHERE id = ?', [status, req.params.id], function (err) {
+  let sql = 'UPDATE orders SET status = ?';
+  const params = [status];
+
+  if (status === 'avance' && advance_price !== undefined) {
+    sql += ', advance_price = ?';
+    params.push(advance_price);
+  }
+
+  sql += ' WHERE id = ?';
+  params.push(req.params.id);
+
+  db.run(sql, params, function (err) {
     if (err) return res.status(500).json({ message: 'Server error' });
     if (this.changes === 0) return res.status(404).json({ message: 'Order not found' });
 
     res.json({ message: 'Order updated successfully' });
 
-    if (status === 'confirmed' || status === 'canceled') {
+    if (status === 'avance') {
+      db.get(`SELECT o.*, p.title as package_title FROM orders o LEFT JOIN packages p ON o.package_id = p.id WHERE o.id = ?`, [req.params.id], async (err, order) => {
+        if (err || !order) return;
+
+        db.get(`SELECT access_token, refresh_token, expiry_date FROM google_tokens WHERE id = 1`, async (err, tokens) => {
+          if (err || !tokens || !tokens.access_token) return;
+
+          try {
+            const { addEventToCalendar } = require('../services/googleCalendar');
+            const startTime = order.event_date ? new Date(order.event_date + 'T09:00:00').toISOString() : new Date().toISOString();
+            const endTime = order.event_date ? new Date(order.event_date + 'T18:00:00').toISOString() : new Date().toISOString();
+            await addEventToCalendar(tokens, {
+              title: `${order.customer_name} - ${order.package_title || 'Événement'}`,
+              description: `Client: ${order.customer_name}\nTél: ${order.phone}\nAdresse: ${order.address || ''}\nNotes: ${order.notes || ''}`,
+              start: startTime,
+              end: endTime,
+            });
+          } catch (e) {
+            console.error('Calendar event creation failed:', e.message);
+          }
+        });
+      });
+    }
+
+    if (['confirmed', 'canceled', 'kamel', 'termini'].includes(status)) {
       db.get(`SELECT o.* FROM orders o WHERE o.id = ?`, [req.params.id], async (err, order) => {
         if (err || !order) return;
 
@@ -193,6 +234,32 @@ Bonjour *${order.customer_name}* 👋
 Excellente nouvelle ! Votre réservation est désormais *confirmée* 🎉
 
 Notre équipe vous contactera bientôt pour les derniers détails. À très vite ✨
+
+_Afrah - Mariage & Événements_`;
+          await whatsapp.sendMessage(order.phone, msg);
+        }
+
+        if (status === 'kamel') {
+          const msg = `✅ *Paiement complet — #${order.id}*
+
+Bonjour *${order.customer_name}* 👋
+
+Votre paiement a été reçu en totalité. Merci pour votre confiance 🤍
+
+Tout est prêt pour votre événement ! 🎉
+
+_Afrah - Mariage & Événements_`;
+          await whatsapp.sendMessage(order.phone, msg);
+        }
+
+        if (status === 'termini') {
+          const msg = `🎉 *Événement terminé — #${order.id}*
+
+Bonjour *${order.customer_name}* 👋
+
+Nous espérons que votre événement s'est déroulé à la perfection ! ✨
+
+Merci de nous avoir choisis pour ce jour spécial. N'hésitez pas à nous recommander à vos proches 🤍
 
 _Afrah - Mariage & Événements_`;
           await whatsapp.sendMessage(order.phone, msg);

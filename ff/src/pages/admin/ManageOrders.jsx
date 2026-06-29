@@ -18,6 +18,14 @@ const statusConfig = {
     icon: Clock,
     dot: 'bg-amber-500',
   },
+  avance: {
+    label: 'Avance',
+    bg: 'bg-blue-50',
+    text: 'text-blue-700',
+    border: 'border-blue-200',
+    icon: CheckCircle2,
+    dot: 'bg-blue-500',
+  },
   confirmed: {
     label: 'Confirmée',
     bg: 'bg-emerald-50',
@@ -25,6 +33,22 @@ const statusConfig = {
     border: 'border-emerald-200',
     icon: CheckCircle2,
     dot: 'bg-emerald-500',
+  },
+  kamel: {
+    label: 'Payé (Kamel)',
+    bg: 'bg-green-50',
+    text: 'text-green-700',
+    border: 'border-green-200',
+    icon: CheckCircle2,
+    dot: 'bg-green-500',
+  },
+  termini: {
+    label: 'Terminée',
+    bg: 'bg-indigo-50',
+    text: 'text-indigo-700',
+    border: 'border-indigo-200',
+    icon: CheckCircle2,
+    dot: 'bg-indigo-500',
   },
   canceled: {
     label: 'Annulée',
@@ -48,8 +72,9 @@ export default function ManageOrders() {
   const limit = 10;
 
   // Confirm modals
-  const [confirmAction, setConfirmAction] = useState(null); // { type: 'confirm'|'cancel'|'delete', orderId, orderName }
+  const [confirmAction, setConfirmAction] = useState(null); // { type: 'confirm'|'cancel'|'delete'|'avance'|'kamel'|'termini', orderId, orderName }
   const [processing, setProcessing] = useState(false);
+  const [advancePrice, setAdvancePrice] = useState('');
 
   const fetchOrders = (searchTerm = search, pageNum = page) => {
     setLoading(true);
@@ -84,10 +109,13 @@ export default function ManageOrders() {
   const updateStatus = async (id, status) => {
     setProcessing(true);
     try {
-      await API.put(`/orders/${id}`, { status });
+      const body = { status };
+      if (status === 'avance') body.advance_price = parseFloat(advancePrice) || 0;
+      await API.put(`/orders/${id}`, body);
       toast.success(`Réservation ${statusConfig[status].label.toLowerCase()}`);
       fetchOrders();
       setConfirmAction(null);
+      setAdvancePrice('');
     } catch {
       toast.error('Erreur de mise à jour');
     } finally {
@@ -114,7 +142,7 @@ export default function ManageOrders() {
     if (confirmAction.type === 'delete') {
       handleDelete(confirmAction.orderId);
     } else {
-      updateStatus(confirmAction.orderId, confirmAction.type === 'confirm' ? 'confirmed' : 'canceled');
+      updateStatus(confirmAction.orderId, confirmAction.type);
     }
   };
 
@@ -124,9 +152,15 @@ export default function ManageOrders() {
     if (!confirmAction) return {};
     const name = confirmAction.orderName;
     switch (confirmAction.type) {
-      case 'confirm':
+      case 'avance':
+        return { title: 'Marquer avance', message: `Voulez-vous marquer la réservation de ${name} comme "Avance" ? Un événement sera ajouté au calendrier Google.` };
+      case 'confirmed':
         return { title: 'Confirmer la réservation', message: `Voulez-vous confirmer la réservation de ${name} ? Un message WhatsApp sera envoyé au client.` };
-      case 'cancel':
+      case 'kamel':
+        return { title: 'Paiement complet', message: `Voulez-vous marquer la réservation de ${name} comme "Payée en totalité" ?` };
+      case 'termini':
+        return { title: 'Terminer', message: `Voulez-vous marquer la réservation de ${name} comme "Terminée" ?` };
+      case 'canceled':
         return { title: 'Annuler la réservation', message: `Voulez-vous annuler la réservation de ${name} ? Un message WhatsApp sera envoyé au client.` };
       case 'delete':
         return { title: 'Supprimer la réservation', message: `Cette action est irréversible. Voulez-vous vraiment supprimer la réservation de ${name} ?` };
@@ -205,12 +239,18 @@ export default function ManageOrders() {
                       </div>
                       <div>
                         <div className="font-semibold text-gray-900 text-sm">{order.customer_name}</div>
-                        {order.notes && (
-                          <div className="flex items-center gap-1 mt-0.5">
-                            <MessageSquare size={10} className="text-gray-300" />
-                            <span className="text-[10px] text-gray-400 line-clamp-1 max-w-[200px]">{order.notes}</span>
-                          </div>
-                        )}
+                    {order.notes && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <MessageSquare size={10} className="text-gray-300" />
+                        <span className="text-[10px] text-gray-400 line-clamp-1 max-w-[200px]">{order.notes}</span>
+                      </div>
+                    )}
+                    {order.advance_price > 0 && (
+                      <div className="flex items-center gap-1 mt-0.5">
+                        <svg className="w-3 h-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                        <span className="text-[10px] text-blue-600 font-semibold">{order.advance_price} MAD</span>
+                      </div>
+                    )}
                       </div>
                     </div>
                   </td>
@@ -256,14 +296,28 @@ export default function ManageOrders() {
                       {order.status === 'pending' && (
                         <>
                           <button
-                            onClick={() => setConfirmAction({ type: 'confirm', orderId: order.id, orderName: order.customer_name })}
+                            onClick={() => { setAdvancePrice(''); setConfirmAction({ type: 'avance', orderId: order.id, orderName: order.customer_name }); }}
+                            className="p-2 rounded-lg hover:bg-blue-50 text-blue-500 hover:text-blue-600 transition-colors"
+                            title="Avance"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          </button>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'confirmed', orderId: order.id, orderName: order.customer_name })}
                             className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-500 hover:text-emerald-600 transition-colors"
                             title="Confirmer"
                           >
                             <CheckCircle2 size={16} />
                           </button>
                           <button
-                            onClick={() => setConfirmAction({ type: 'cancel', orderId: order.id, orderName: order.customer_name })}
+                            onClick={() => setConfirmAction({ type: 'kamel', orderId: order.id, orderName: order.customer_name })}
+                            className="p-2 rounded-lg hover:bg-green-50 text-green-500 hover:text-green-600 transition-colors"
+                            title="Payé (Kamel)"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          </button>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
                             className="p-2 rounded-lg hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-colors"
                             title="Annuler"
                           >
@@ -271,13 +325,77 @@ export default function ManageOrders() {
                           </button>
                         </>
                       )}
-                      {order.status !== 'pending' && (
-                        <button
-                          onClick={() => setConfirmAction({ type: order.status === 'confirmed' ? 'cancel' : 'confirm', orderId: order.id, orderName: order.customer_name })}
-                          className="p-2 rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors"
-                          title={order.status === 'confirmed' ? 'Annuler' : 'Confirmer'}
-                        >
-                          {order.status === 'confirmed' ? <XCircle size={16} /> : <CheckCircle2 size={16} />}
+                      {order.status === 'avance' && (
+                        <>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'confirmed', orderId: order.id, orderName: order.customer_name })}
+                            className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-500 hover:text-emerald-600 transition-colors"
+                            title="Confirmer"
+                          >
+                            <CheckCircle2 size={16} />
+                          </button>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'kamel', orderId: order.id, orderName: order.customer_name })}
+                            className="p-2 rounded-lg hover:bg-green-50 text-green-500 hover:text-green-600 transition-colors"
+                            title="Payé (Kamel)"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          </button>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
+                            className="p-2 rounded-lg hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-colors"
+                            title="Annuler"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        </>
+                      )}
+                      {order.status === 'confirmed' && (
+                        <>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'kamel', orderId: order.id, orderName: order.customer_name })}
+                            className="p-2 rounded-lg hover:bg-green-50 text-green-500 hover:text-green-600 transition-colors"
+                            title="Payé (Kamel)"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                          </button>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'termini', orderId: order.id, orderName: order.customer_name })}
+                            className="p-2 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-600 transition-colors"
+                            title="Terminée"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          </button>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
+                            className="p-2 rounded-lg hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-colors"
+                            title="Annuler"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        </>
+                      )}
+                      {order.status === 'kamel' && (
+                        <>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'termini', orderId: order.id, orderName: order.customer_name })}
+                            className="p-2 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-600 transition-colors"
+                            title="Terminée"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                          </button>
+                          <button
+                            onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
+                            className="p-2 rounded-lg hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-colors"
+                            title="Annuler"
+                          >
+                            <XCircle size={16} />
+                          </button>
+                        </>
+                      )}
+                      {['termini', 'canceled'].includes(order.status) && (
+                        <button disabled className="p-2 rounded-lg text-gray-300" title="Aucune action">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636" /></svg>
                         </button>
                       )}
                       <button
@@ -361,31 +479,80 @@ export default function ManageOrders() {
                     <span className="truncate">{order.notes}</span>
                   </div>
                 )}
+                {order.advance_price > 0 && (
+                  <div className="flex items-center gap-2 text-xs text-blue-600 font-semibold">
+                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    {order.advance_price} MAD
+                  </div>
+                )}
               </div>
 
               <div className="flex gap-2 mt-3 pt-3 border-t border-gray-50">
-                {order.status === 'pending' ? (
+                {order.status === 'pending' && (
                   <>
                     <button
-                      onClick={() => setConfirmAction({ type: 'confirm', orderId: order.id, orderName: order.customer_name })}
+                      onClick={() => { setAdvancePrice(''); setConfirmAction({ type: 'avance', orderId: order.id, orderName: order.customer_name }); }}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-blue-50 text-blue-600 text-xs font-medium hover:bg-blue-100 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Avance
+                    </button>
+                    <button
+                      onClick={() => setConfirmAction({ type: 'confirmed', orderId: order.id, orderName: order.customer_name })}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-medium hover:bg-emerald-100 transition-colors"
                     >
                       <CheckCircle2 size={13} /> Confirmer
                     </button>
                     <button
-                      onClick={() => setConfirmAction({ type: 'cancel', orderId: order.id, orderName: order.customer_name })}
+                      onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-rose-50 text-rose-500 text-xs font-medium hover:bg-rose-100 transition-colors"
                     >
                       <XCircle size={13} /> Annuler
                     </button>
                   </>
-                ) : (
+                )}
+                {['avance', 'confirmed'].includes(order.status) && (
+                  <>
+                    <button
+                      onClick={() => setConfirmAction({ type: 'kamel', orderId: order.id, orderName: order.customer_name })}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-50 text-green-600 text-xs font-medium hover:bg-green-100 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Kamel
+                    </button>
+                    <button
+                      onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-rose-50 text-rose-500 text-xs font-medium hover:bg-rose-100 transition-colors"
+                    >
+                      <XCircle size={13} /> Annuler
+                    </button>
+                  </>
+                )}
+                {order.status === 'kamel' && (
+                  <>
+                    <button
+                      onClick={() => setConfirmAction({ type: 'termini', orderId: order.id, orderName: order.customer_name })}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-indigo-50 text-indigo-600 text-xs font-medium hover:bg-indigo-100 transition-colors"
+                    >
+                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg> Terminer
+                    </button>
+                    <button
+                      onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
+                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-rose-50 text-rose-500 text-xs font-medium hover:bg-rose-100 transition-colors"
+                    >
+                      <XCircle size={13} /> Annuler
+                    </button>
+                  </>
+                )}
+                {['termini', 'canceled'].includes(order.status) && (
+                  <div className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-50 text-gray-400 text-xs font-medium">
+                    Aucune action
+                  </div>
+                )}
+                {!['termini', 'canceled'].includes(order.status) && order.status !== 'pending' && !['avance', 'confirmed', 'kamel'].includes(order.status) && (
                   <button
-                    onClick={() => setConfirmAction({ type: order.status === 'confirmed' ? 'cancel' : 'confirm', orderId: order.id, orderName: order.customer_name })}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-50 text-gray-600 text-xs font-medium hover:bg-gray-100 transition-colors"
+                    onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
+                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-rose-50 text-rose-500 text-xs font-medium hover:bg-rose-100 transition-colors"
                   >
-                    {order.status === 'confirmed' ? <XCircle size={13} /> : <CheckCircle2 size={13} />}
-                    {order.status === 'confirmed' ? 'Annuler' : 'Confirmer'}
+                    <XCircle size={13} /> Annuler
                   </button>
                 )}
                 <button
@@ -442,9 +609,24 @@ export default function ManageOrders() {
         title={getConfirmMessage().title}
         message={getConfirmMessage().message}
         onConfirm={executeConfirm}
-        onCancel={() => setConfirmAction(null)}
+        onCancel={() => { setConfirmAction(null); setAdvancePrice(''); }}
         loading={processing}
-      />
+        confirmLabel={confirmAction?.type === 'avance' ? 'Enregistrer' : confirmAction?.type === 'delete' ? 'Supprimer' : 'Confirmer'}
+      >
+        {confirmAction?.type === 'avance' && (
+          <div>
+            <label className="block text-xs font-medium text-gray-600 mb-1">Montant de l'avance (MAD)</label>
+            <input
+              type="number"
+              value={advancePrice}
+              onChange={e => setAdvancePrice(e.target.value)}
+              placeholder="0"
+              className="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-400/50"
+              autoFocus
+            />
+          </div>
+        )}
+      </ConfirmModal>
     </div>
   );
 }

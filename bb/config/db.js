@@ -95,8 +95,10 @@ db.serialize(() => {
     event_date TEXT DEFAULT '',
     package_id INTEGER,
     notes TEXT DEFAULT '',
-    status TEXT DEFAULT 'pending' CHECK(status IN ('pending','confirmed','canceled')),
+    status TEXT DEFAULT 'pending',
+    advance_price REAL DEFAULT 0,
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    custom_items TEXT DEFAULT '',
     FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE SET NULL
   )`);
 
@@ -167,16 +169,54 @@ db.serialize(() => {
     address TEXT DEFAULT '',
     product_id INTEGER,
     notes TEXT DEFAULT '',
-    status TEXT DEFAULT 'pending' CHECK(status IN ('pending','confirmed','canceled')),
+    status TEXT DEFAULT 'pending',
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
   )`);
 
+  // Migration: drop product_orders CHECK constraint if still present
+  db.run(`ALTER TABLE product_orders RENAME TO product_orders_old`, (err) => {
+    if (!err) {
+      db.run(`CREATE TABLE product_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        address TEXT DEFAULT '',
+        product_id INTEGER,
+        notes TEXT DEFAULT '',
+        status TEXT DEFAULT 'pending',
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+      )`, () => {
+        db.run(`INSERT INTO product_orders SELECT * FROM product_orders_old`, () => {
+          db.run(`DROP TABLE product_orders_old`);
+        });
+      });
+    }
+  });
+
+  db.run(`CREATE TABLE IF NOT EXISTS google_tokens (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    access_token TEXT DEFAULT '',
+    refresh_token TEXT DEFAULT '',
+    expiry_date INTEGER DEFAULT 0
+  )`);
+
+  db.run(`INSERT OR IGNORE INTO google_tokens (id, access_token, refresh_token, expiry_date) VALUES (1, '', '', 0)`);
+
   db.run(`CREATE TABLE IF NOT EXISTS hero_slides (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
-    image TEXT NOT NULL,
+    image TEXT NOT NULL,              -- هادي هي تصويرة الـ PC
+    image_mobile TEXT DEFAULT '',     -- هادي هي تصويرة الموبايل الجديدة
     created_at DATETIME DEFAULT CURRENT_TIMESTAMP
   )`);
+
+  // 2. هاد السطر كيزيد العمود للناس اللي ديجا عندهم قاعدة البيانات قديمة بلا ما تضيع الداتا ديالهم
+  db.run(`ALTER TABLE hero_slides ADD COLUMN image_mobile TEXT DEFAULT ''`, (err) => {
+    if (err && !err.message.includes('duplicate column name') && !err.message.includes('duplicate column')) {
+      console.error('Error adding image_mobile to hero_slides:', err.message);
+    }
+  });
 
   db.run(`CREATE TABLE IF NOT EXISTS contacts (
     id INTEGER PRIMARY KEY AUTOINCREMENT,

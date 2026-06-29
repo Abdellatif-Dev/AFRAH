@@ -6,6 +6,7 @@ const { verifyToken } = require('../middleware/auth');
 
 const router = express.Router();
 
+// الـ Storage الافتراضي القديم للملفات العادية
 const storage = multer.diskStorage({
   destination: (req, file, cb) => {
     const isVideo = file.mimetype.startsWith('video/');
@@ -42,6 +43,46 @@ const fileFilter = (req, file, cb) => {
 
 const upload = multer({ storage, fileFilter, limits: { fileSize: 50 * 1024 * 1024 } });
 
+// ─── خاص بالـ Dual Slides Upload ─────────────────────────────────────────
+const slideStorage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    const baseDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
+    const dir = path.join(baseDir, 'uploads', 'slides');
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    cb(null, dir);
+  },
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname);
+    const name = Date.now() + '-' + Math.round(Math.random() * 1e9) + ext;
+    cb(null, name);
+  }
+});
+const uploadSlides = multer({ storage: slideStorage, fileFilter });
+
+// الـ Route الجديد للرفع المزدوج (غادي يولي مساره هو /api/upload/dual)
+router.post('/dual', verifyToken, (req, res) => {
+  uploadSlides.fields([
+    { name: 'filePc', maxCount: 1 },
+    { name: 'fileMobile', maxCount: 1 }
+  ])(req, res, (err) => {
+    if (err) {
+      console.error("Multer error:", err.message);
+      return res.status(400).json({ message: err.message });
+    }
+    
+    // هنا رجعناهم اختياريين باش يلا بغينا نعدلو غير وحدة فيهم
+    const pcFile = req.files['filePc'] ? req.files['filePc'][0] : null;
+    const mobileFile = req.files['fileMobile'] ? req.files['fileMobile'][0] : null;
+
+    res.json({
+      pcName: pcFile ? pcFile.filename : null,
+      mobileName: mobileFile ? mobileFile.filename : null
+    });
+  });
+});
+// ──────────────────────────────────────────────────────────────────────────
+
+// الـ Routes القديمة ديال الرفع العادي
 router.post('/', verifyToken, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ message: 'No file uploaded' });
   res.json({
@@ -56,7 +97,7 @@ router.post('/event-media', verifyToken, (req, res) => {
   if (!event_id || !type || !file_name) {
     return res.status(400).json({ message: 'event_id, type, and file_name required' });
   }
-  db = require('../config/db');
+  const db = require('../config/db');
   db.run('INSERT INTO event_media (event_id, type, file_name) VALUES (?, ?, ?)',
     [event_id, type, file_name],
     function (err) {
@@ -67,7 +108,7 @@ router.post('/event-media', verifyToken, (req, res) => {
 });
 
 router.delete('/event-media/:id', verifyToken, (req, res) => {
-  db = require('../config/db');
+  const db = require('../config/db');
   db.get('SELECT * FROM event_media WHERE id = ?', [req.params.id], (err, media) => {
     if (err || !media) return res.status(404).json({ message: 'Media not found' });
 

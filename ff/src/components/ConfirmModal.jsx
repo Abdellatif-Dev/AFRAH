@@ -1,6 +1,6 @@
 import { AlertTriangle, X } from 'lucide-react';
 
-export default function ConfirmModal({ open, title, message, onConfirm, onCancel, confirmLabel = 'Supprimer', loading }) {
+export default function ConfirmModal({ open, title, message, onConfirm, onCancel, confirmLabel = 'Supprimer', loading, children }) {
   if (!open) return null;
   return (
     <div className="fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4" onClick={onCancel}>
@@ -12,6 +12,7 @@ export default function ConfirmModal({ open, title, message, onConfirm, onCancel
           <div className="flex-1 min-w-0">
             <h3 className="text-lg font-display font-semibold text-gray-900">{title || 'Confirmer'}</h3>
             <p className="text-sm text-gray-500 mt-1">{message || 'Voulez-vous continuer ?'}</p>
+            {children && <div className="mt-3">{children}</div>}
           </div>
           <button onClick={onCancel} className="text-gray-300 hover:text-gray-500 transition-colors">
             <X size={18} />

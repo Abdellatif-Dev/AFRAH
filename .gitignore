@@ -5,12 +5,30 @@ ff/dist/
 # Backend
 bb/node_modules/
 bb/.env
+bb/google-credentials.json
+
 
 # Logs
 *.log
 
 # VS Code
 .vscode/
+
+# WhatsApp session data
+bb/whatsapp-data/
+bb/.wwebjs_cache/
+
+# Uploads (user-generated)
+bb/uploads/
+
+# Database
+bb/database.sqlite
+
+# Temp
+bb/qr-code.png
+bb/server-pid.txt
+bb/start-server.ps1
+bb/test-cal.js
 
 # OS files
 .DS_Store
