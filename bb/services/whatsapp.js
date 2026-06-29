@@ -111,6 +111,13 @@ function formatJID(phone) {
   return `${cleaned}@c.us`;
 }
 
+async function withTimeout(promise, ms = 30000) {
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(`Timeout after ${ms}ms`)), ms))
+  ]);
+}
+
 async function sendMessage(phone, message) {
   console.log(`🔍 [WA-sendMessage] Called. isReady=${isReady}, client=${!!client}, phone="${phone}"`);
   if (!isReady || !client) {
@@ -122,23 +129,11 @@ async function sendMessage(phone, message) {
     const fullNumber = formatJID(phone);
     console.log(`📲 [WA-sendMessage] Formatted JID: ${fullNumber}`);
 
-    // Check if number is registered on WhatsApp
-    try {
-      const isRegistered = await client.isRegisteredUser(fullNumber);
-      console.log(`📲 [WA-sendMessage] isRegisteredUser(${fullNumber}) = ${isRegistered}`);
-      if (!isRegistered) {
-        console.warn(`⚠️ [WA-sendMessage] Number ${fullNumber} is NOT registered on WhatsApp!`);
-      }
-    } catch (regErr) {
-      console.warn(`⚠️ [WA-sendMessage] Could not check registration: ${regErr.message}`);
-    }
-
-    const result = await client.sendMessage(fullNumber, message);
+    const result = await withTimeout(client.sendMessage(fullNumber, message), 60000);
     console.log(`✅ [WA-sendMessage] Message SENT to ${fullNumber}. Result ID: ${result?.id?._serialized || 'unknown'}`);
     return true;
   } catch (err) {
     console.error(`❌ [WA-sendMessage] FAILED to send to phone="${phone}":`, err.message);
-    console.error(`❌ [WA-sendMessage] Full error:`, err);
     return false;
   }
 }
@@ -154,12 +149,11 @@ async function sendMedia(phone, imagePath, caption) {
     const media = MessageMedia.fromFilePath(imagePath);
     const fullNumber = formatJID(phone);
     console.log(`📲 [WA-sendMedia] Formatted JID: ${fullNumber}`);
-    await client.sendMessage(fullNumber, media, { caption });
+    await withTimeout(client.sendMessage(fullNumber, media, { caption }), 60000);
     console.log(`✅ [WA-sendMedia] Media SENT to ${fullNumber}`);
     return true;
   } catch (err) {
     console.error(`❌ [WA-sendMedia] FAILED to send to phone="${phone}":`, err.message);
-    console.error(`❌ [WA-sendMedia] Full error:`, err);
     return false;
   }
 }
