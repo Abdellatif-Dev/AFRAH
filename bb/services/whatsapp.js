@@ -46,13 +46,20 @@ function init() {
 
   const puppeteerOptions = {
     headless: true,
-    protocolTimeout: 300000, // 5 min
+    protocolTimeout: 300000,
     args: [
       '--no-sandbox',
       '--disable-setuid-sandbox',
       '--disable-dev-shm-usage',
       '--disable-gpu',
-      '--disable-extensions'
+      '--disable-extensions',
+      '--single-process',
+      '--disable-accelerated-2d-canvas',
+      '--disable-features=VizDisplayCompositor',
+      '--disable-features=TranslateUI',
+      '--disable-sync',
+      '--mute-audio',
+      '--no-zygote'
     ]
   };
 
