@@ -1,4 +1,4 @@
-const { makeWASocket, useMultiFileAuthState, Browsers, DisconnectReason } = require('@whiskeysockets/baileys');
+const { makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
 const path = require('path');
 const fs = require('fs');
 const pino = require('pino');
@@ -20,7 +20,7 @@ function init() {
     socket = makeWASocket({
       auth: state,
       printQRInTerminal: false,
-      browser: Browsers.whatsaio('Afrah'),
+      browser: ['Afrah', 'Chrome', '126'],
       logger: pino({ level: 'silent' }),
       syncFullHistory: false,
     });
