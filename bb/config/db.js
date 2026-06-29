@@ -102,6 +102,30 @@ db.serialize(() => {
     FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE SET NULL
   )`);
 
+  // Migration: drop old CHECK constraint on orders.status
+  db.run(`ALTER TABLE orders RENAME TO orders_old`, (err) => {
+    if (!err) {
+      db.run(`CREATE TABLE orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        customer_name TEXT NOT NULL,
+        phone TEXT NOT NULL,
+        address TEXT DEFAULT '',
+        event_date TEXT DEFAULT '',
+        package_id INTEGER,
+        notes TEXT DEFAULT '',
+        status TEXT DEFAULT 'pending',
+        advance_price REAL DEFAULT 0,
+        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+        custom_items TEXT DEFAULT '',
+        FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE SET NULL
+      )`, () => {
+        db.run(`INSERT INTO orders SELECT * FROM orders_old`, () => {
+          db.run(`DROP TABLE orders_old`);
+        });
+      });
+    }
+  });
+
   db.run(`CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     phone TEXT DEFAULT '',
