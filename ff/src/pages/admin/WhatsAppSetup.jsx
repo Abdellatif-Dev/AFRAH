@@ -130,7 +130,7 @@ export default function WhatsAppSetup() {
           ) : (
             <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">
               <p className="text-gray-500">Connectez votre Google Calendar pour synchroniser les réservations.</p>
-              <a href="http://localhost:5000/api/calendar/auth"
+              <a href={`${window.location.origin}/api/calendar/auth`}
                 className="inline-flex items-center gap-2 bg-gray-900 hover:bg-gray-800 text-white text-sm font-medium py-2.5 px-5 rounded-full transition-all">
                 <Calendar size={15} /> Connecter Google Calendar
               </a>
