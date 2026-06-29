@@ -28,12 +28,44 @@ const db = new sqlite3.Database(dbPath, (err) => {
   else console.log('Connected to SQLite database');
 });
 
-// Recovery: if orders_old exists (from broken migration), restore orders
-db.run("ALTER TABLE orders_old RENAME TO orders", (err) => {
-  if (!err) console.log("✅ Recovered orders table from orders_old backup");
-});
+// Recovery: restore orders from any backup if missing
+const ordersSQL = `CREATE TABLE IF NOT EXISTS orders (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  customer_name TEXT NOT NULL,
+  phone TEXT NOT NULL,
+  address TEXT DEFAULT '',
+  event_date TEXT DEFAULT '',
+  package_id INTEGER,
+  notes TEXT DEFAULT '',
+  status TEXT DEFAULT 'pending',
+  advance_price REAL DEFAULT 0,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+  custom_items TEXT DEFAULT '',
+  FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE SET NULL
+)`;
 
 db.serialize(() => {
+  // Try restore from backup tables (broken migrations)
+  db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='orders_old'", [], (err, row) => {
+    if (row) db.run("ALTER TABLE orders_old RENAME TO orders");
+  });
+  db.get("SELECT name FROM sqlite_master WHERE type='table' AND name='orders_backup'", [], (err, row) => {
+    if (row) db.run("ALTER TABLE orders_backup RENAME TO orders");
+  });
+  // Ensure orders exists (create if missing)
+  db.run(ordersSQL);
+  // Rebuild orders to drop old CHECK constraint (safe: renames, creates fresh, copies data, drops old)
+  // This runs every startup on DBs that still have the old constraint
+  db.run("ALTER TABLE orders RENAME TO __orders_old__", (e) => {
+    if (!e) {
+      db.run(ordersSQL, () => {
+        db.run("INSERT OR IGNORE INTO orders SELECT * FROM __orders_old__", () => {
+          db.run("DROP TABLE IF EXISTS __orders_old__");
+        });
+      });
+    }
+  });
+
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     name TEXT NOT NULL,
@@ -91,26 +123,6 @@ db.serialize(() => {
     type TEXT DEFAULT 'gratuite' CHECK(type IN ('gratuite','pay')),
     FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
   )`);
-
-  // Rebuild orders table to drop any old CHECK constraint
-  // (works on fresh DB too — renames, creates new, copies data, drops old)
-  db.run("ALTER TABLE orders RENAME TO orders_backup");
-  db.run(`CREATE TABLE IF NOT EXISTS orders (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    customer_name TEXT NOT NULL,
-    phone TEXT NOT NULL,
-    address TEXT DEFAULT '',
-    event_date TEXT DEFAULT '',
-    package_id INTEGER,
-    notes TEXT DEFAULT '',
-    status TEXT DEFAULT 'pending',
-    advance_price REAL DEFAULT 0,
-    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-    custom_items TEXT DEFAULT '',
-    FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE SET NULL
-  )`);
-  db.run("INSERT INTO orders SELECT * FROM orders_backup");
-  db.run("DROP TABLE IF EXISTS orders_backup");
 
   db.run(`CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
