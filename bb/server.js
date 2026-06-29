@@ -118,6 +118,24 @@ if (fs.existsSync(frontendDist)) {
   });
 }
 
+// ✅ Railway fix: msah Chrome lock files bach ma yblockch
+const waDataPath = process.env.PERSISTENT_DIR
+  ? path.join(process.env.PERSISTENT_DIR, 'whatsapp-data')
+  : path.join(__dirname, 'whatsapp-data');
+if (fs.existsSync(waDataPath)) {
+  const cleanSingleton = (dir) => {
+    if (!fs.existsSync(dir)) return;
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      const fp = path.join(dir, e.name);
+      if (e.isDirectory()) cleanSingleton(fp);
+      else if (e.name.startsWith('Singleton')) {
+        try { fs.unlinkSync(fp); console.log('✅ Cleaned:', fp); } catch {}
+      }
+    }
+  };
+  cleanSingleton(waDataPath);
+}
+
 whatsapp.init();
 
 app.listen(PORT, () => {
