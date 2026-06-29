@@ -75,6 +75,8 @@ function init() {
     console.log('📱 WhatsApp QR code generated. Scan with your phone.');
   });
 
+  let pingInterval = null;
+
   client.on('ready', async () => {
     console.log('✅ WhatsApp client is ready!');
     qrCode = null;
@@ -84,11 +86,24 @@ function init() {
     isReady = true;
 
     console.log('✅ WhatsApp fully initialized.');
+
+    // Check connection every 30s
+    if (pingInterval) clearInterval(pingInterval);
+    pingInterval = setInterval(async () => {
+      if (!client || !isReady) { clearInterval(pingInterval); return; }
+      try {
+        await withTimeout(client.getState(), 10000);
+      } catch {
+        console.log('⚠️ WhatsApp ping failed, restarting...');
+        restart();
+      }
+    }, 30000);
   });
 
-  client.on('disconnected', () => {
+  client.on('disconnected', (reason) => {
     isReady = false;
-    console.log('⚠️ WhatsApp client disconnected.');
+    console.log('⚠️ WhatsApp client disconnected:', reason);
+    restart();
   });
 
   client.on('auth_failure', () => {
@@ -134,6 +149,8 @@ async function sendMessage(phone, message) {
     return true;
   } catch (err) {
     console.error(`❌ [WA-sendMessage] FAILED to send to phone="${phone}":`, err.message);
+    // Auto-restart ila kan l client f état khayeb
+    restart();
     return false;
   }
 }
@@ -154,6 +171,8 @@ async function sendMedia(phone, imagePath, caption) {
     return true;
   } catch (err) {
     console.error(`❌ [WA-sendMedia] FAILED to send to phone="${phone}":`, err.message);
+    // Auto-restart ila kan l client f état khayeb
+    restart();
     return false;
   }
 }
