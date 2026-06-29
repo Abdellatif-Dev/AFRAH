@@ -147,28 +147,34 @@ router.get('/', verifyToken, (req, res) => {
   const limit = parseInt(req.query.limit) || 20;
   const offset = (page - 1) * limit;
   const search = req.query.search;
+  const statusFilter = req.query.status;
 
-  let where = '';
+  const conditions = [];
   const params = [];
-  const countParams = [];
 
   if (search) {
-    where = ' WHERE (o.customer_name LIKE ? OR o.phone LIKE ?)';
+    conditions.push('(o.customer_name LIKE ? OR o.phone LIKE ?)');
     const s = `%${search}%`;
     params.push(s, s);
-    countParams.push(s, s);
   }
+
+  if (statusFilter && statusFilter !== 'all') {
+    conditions.push('o.status = ?');
+    params.push(statusFilter);
+  }
+
+  const whereClause = conditions.length ? ' WHERE ' + conditions.join(' AND ') : '';
 
   db.all(`
     SELECT o.*, p.title as package_title
     FROM orders o 
     LEFT JOIN packages p ON o.package_id = p.id 
-    ${where}
+    ${whereClause}
     ORDER BY o.created_at DESC 
     LIMIT ? OFFSET ?
   `, [...params, limit, offset], (err, rows) => {
     if (err) return res.status(500).json({ message: 'Server error' });
-    db.get(`SELECT COUNT(*) as total FROM orders o${where}`, countParams, (_, count) => {
+    db.get(`SELECT COUNT(*) as total FROM orders o${whereClause}`, params, (_, count) => {
       res.json({ orders: rows, total: count ? count.total : 0, page, limit });
     });
   });

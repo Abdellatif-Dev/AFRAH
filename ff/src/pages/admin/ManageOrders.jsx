@@ -66,6 +66,9 @@ export default function ManageOrders() {
   const [search, setSearch] = useState('');
   const [typingTimeout, setTypingTimeout] = useState(null);
 
+  // Status filter
+  const [statusFilter, setStatusFilter] = useState('all');
+
   // Pagination
   const [page, setPage] = useState(1);
   const [total, setTotal] = useState(0);
@@ -76,10 +79,11 @@ export default function ManageOrders() {
   const [processing, setProcessing] = useState(false);
   const [advancePrice, setAdvancePrice] = useState('');
 
-  const fetchOrders = (searchTerm = search, pageNum = page) => {
+  const fetchOrders = (searchTerm = search, pageNum = page, filterStatus = statusFilter) => {
     setLoading(true);
     const params = new URLSearchParams({ limit: String(limit), page: String(pageNum) });
     if (searchTerm) params.append('search', searchTerm);
+    if (filterStatus && filterStatus !== 'all') params.append('status', filterStatus);
     API.get(`/orders?${params}`)
       .then(res => {
         setOrders(res.data.orders || []);
@@ -89,7 +93,12 @@ export default function ManageOrders() {
       .finally(() => setLoading(false));
   };
 
-  useEffect(() => { fetchOrders(); }, []);
+  useEffect(() => { fetchOrders(); }, [statusFilter]);
+
+  const handleFilterChange = (filter) => {
+    setStatusFilter(filter);
+    setPage(1);
+  };
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
@@ -97,13 +106,13 @@ export default function ManageOrders() {
     if (typingTimeout) clearTimeout(typingTimeout);
     setTypingTimeout(setTimeout(() => {
       setPage(1);
-      fetchOrders(val, 1);
+      fetchOrders(val, 1, statusFilter);
     }, 300));
   };
 
   const handlePageChange = (newPage) => {
     setPage(newPage);
-    fetchOrders(search, newPage);
+    fetchOrders(search, newPage, statusFilter);
   };
 
   const updateStatus = async (id, status) => {
@@ -202,6 +211,23 @@ export default function ManageOrders() {
           placeholder="Rechercher par nom client ou téléphone..."
           className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-gold-400/50 focus:border-gold-400 transition-all"
         />
+      </div>
+
+      {/* ═══ STATUS FILTER TABS ═══ */}
+      <div className="flex flex-wrap gap-1.5">
+        {[{ key: 'all', label: 'Tous' }, ...Object.entries(statusConfig).map(([key, cfg]) => ({ key, label: cfg.label }))].map(({ key, label }) => (
+          <button
+            key={key}
+            onClick={() => handleFilterChange(key)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${
+              statusFilter === key
+                ? key === 'all' ? 'bg-gray-900 text-white shadow-sm' : `${statusConfig[key].bg} ${statusConfig[key].text} border ${statusConfig[key].border}`
+                : 'bg-gray-50 text-gray-500 hover:bg-gray-100'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
       </div>
 
       {/* ═══ DESKTOP TABLE ═══ */}
