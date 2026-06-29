@@ -199,7 +199,7 @@ router.put('/:id', verifyToken, (req, res) => {
   params.push(req.params.id);
 
   db.run(sql, params, function (err) {
-    if (err) return res.status(500).json({ message: 'Server error' });
+    if (err) { console.error('❌ [Orders PUT] SQL error:', err.message, 'SQL:', sql, 'Params:', params); return res.status(500).json({ message: 'Server error' }); }
     if (this.changes === 0) return res.status(404).json({ message: 'Order not found' });
 
     res.json({ message: 'Order updated successfully' });
