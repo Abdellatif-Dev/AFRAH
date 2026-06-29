@@ -1,22 +1,8 @@
-//require('dotenv').config();
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
 const fs = require('fs');
 const os = require('os');
-
-// Find Chrome for whatsapp-web.js (puppeteer@24 nested dep)
-const chromeDir = path.join(os.homedir(), '.cache', 'puppeteer', 'chrome');
-try {
-  const dirs = fs.readdirSync(chromeDir).sort().reverse();
-  for (const d of dirs) {
-    const candidate = path.join(chromeDir, d, 'chrome-win64', 'chrome.exe');
-    if (fs.existsSync(candidate)) {
-      process.env.PUPPETEER_EXECUTABLE_PATH = candidate;
-      break;
-    }
-  }
-} catch {}
 
 // Copy uploads folder to persistent directory if persistent dir exists but target uploads does not
 const persistentDir = process.env.PERSISTENT_DIR;
@@ -116,24 +102,6 @@ if (fs.existsSync(frontendDist)) {
   app.get('*', (req, res) => {
     res.sendFile(path.join(frontendDist, 'index.html'));
   });
-}
-
-// ✅ Railway fix: msah Chrome lock files bach ma yblockch
-const waDataPath = process.env.PERSISTENT_DIR
-  ? path.join(process.env.PERSISTENT_DIR, 'whatsapp-data')
-  : path.join(__dirname, 'whatsapp-data');
-if (fs.existsSync(waDataPath)) {
-  const cleanSingleton = (dir) => {
-    if (!fs.existsSync(dir)) return;
-    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
-      const fp = path.join(dir, e.name);
-      if (e.isDirectory()) cleanSingleton(fp);
-      else if (e.name.startsWith('Singleton')) {
-        try { fs.unlinkSync(fp); console.log('✅ Cleaned:', fp); } catch {}
-      }
-    }
-  };
-  cleanSingleton(waDataPath);
 }
 
 whatsapp.init();
