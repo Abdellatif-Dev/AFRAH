@@ -28,6 +28,11 @@ const db = new sqlite3.Database(dbPath, (err) => {
   else console.log('Connected to SQLite database');
 });
 
+// Recovery: if orders_old exists (from broken migration), restore orders
+db.run("ALTER TABLE orders_old RENAME TO orders", (err) => {
+  if (!err) console.log("✅ Recovered orders table from orders_old backup");
+});
+
 db.serialize(() => {
   db.run(`CREATE TABLE IF NOT EXISTS users (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -87,6 +92,9 @@ db.serialize(() => {
     FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE CASCADE
   )`);
 
+  // Rebuild orders table to drop any old CHECK constraint
+  // (works on fresh DB too — renames, creates new, copies data, drops old)
+  db.run("ALTER TABLE orders RENAME TO orders_backup");
   db.run(`CREATE TABLE IF NOT EXISTS orders (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     customer_name TEXT NOT NULL,
@@ -101,30 +109,8 @@ db.serialize(() => {
     custom_items TEXT DEFAULT '',
     FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE SET NULL
   )`);
-
-  // Migration: drop old CHECK constraint on orders.status
-  db.run(`ALTER TABLE orders RENAME TO orders_old`, (err) => {
-    if (!err) {
-      db.run(`CREATE TABLE orders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        customer_name TEXT NOT NULL,
-        phone TEXT NOT NULL,
-        address TEXT DEFAULT '',
-        event_date TEXT DEFAULT '',
-        package_id INTEGER,
-        notes TEXT DEFAULT '',
-        status TEXT DEFAULT 'pending',
-        advance_price REAL DEFAULT 0,
-        created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-        custom_items TEXT DEFAULT '',
-        FOREIGN KEY (package_id) REFERENCES packages(id) ON DELETE SET NULL
-      )`, () => {
-        db.run(`INSERT INTO orders SELECT * FROM orders_old`, () => {
-          db.run(`DROP TABLE orders_old`);
-        });
-      });
-    }
-  });
+  db.run("INSERT INTO orders SELECT * FROM orders_backup");
+  db.run("DROP TABLE IF EXISTS orders_backup");
 
   db.run(`CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
