@@ -141,6 +141,14 @@ db.serialize(() => {
     if (err && !err.message.includes('duplicate column')) console.error(err.message);
   });
 
+  db.run(`ALTER TABLE orders ADD COLUMN custom_items TEXT DEFAULT ''`, (err) => {
+    if (err && !err.message.includes('duplicate column')) console.error(err.message);
+  });
+
+  db.run(`ALTER TABLE orders ADD COLUMN advance_price REAL DEFAULT 0`, (err) => {
+    if (err && !err.message.includes('duplicate column')) console.error(err.message);
+  });
+
   db.run(`INSERT OR IGNORE INTO settings (id, phone, email, address, logo, instagram, facebook, twitter, tiktok, whatsapp_chat, map_url, footer_description, admin_whatsapp) VALUES (1, '', '', '', '', '', '', '', '', '', '', '', '')`);
 
   db.run(`CREATE TABLE IF NOT EXISTS product_categories (

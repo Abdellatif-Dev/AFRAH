@@ -66,17 +66,45 @@ export default function WhatsAppSetup() {
     setLoading(false);
   };
 
+  const handleDisconnectCalendar = async () => {
+    try {
+      await API.post('/calendar/disconnect');
+      setCalConnected(false);
+      toast.success('Google Calendar déconnecté');
+    } catch {
+      toast.error('Erreur de déconnexion');
+    }
+  };
+
+  const handleDisconnectWhatsApp = async () => {
+    try {
+      await API.post('/whatsapp/disconnect');
+      setStatus({ ready: false, hasQr: false });
+      setQrData(null);
+      toast.success('WhatsApp déconnecté');
+    } catch {
+      toast.error('Erreur de déconnexion');
+    }
+  };
+
   return (
     <div>
       <h1 className="text-2xl font-display font-bold text-gray-900 mb-6">WhatsApp</h1>
 
       <div className="bg-white rounded-xl shadow-md p-8 max-w-lg space-y-6">
-        <div className="flex items-center gap-3">
-          <div className={`w-3 h-3 rounded-full ${status.ready ? 'bg-green-500' : qrData ? 'bg-amber-500' : 'bg-red-500'}`} />
-          <span className="text-sm font-medium">
-            {status.ready ? '✅ Connecté' : qrData ? '📱 Scanner le QR code' : '❌ Non connecté'}
-          </span>
-        </div>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className={`w-3 h-3 rounded-full ${status.ready ? 'bg-green-500' : qrData ? 'bg-amber-500' : 'bg-red-500'}`} />
+              <span className="text-sm font-medium">
+                {status.ready ? '✅ Connecté' : qrData ? '📱 Scanner le QR code' : '❌ Non connecté'}
+              </span>
+            </div>
+            {status.ready && (
+              <button onClick={handleDisconnectWhatsApp} className="text-xs text-red-500 hover:text-red-700 font-medium">
+                Déconnecter
+              </button>
+            )}
+          </div>
 
         {loading && !qrData && (
           <div className="flex flex-col items-center justify-center py-8 gap-3">
@@ -123,9 +151,12 @@ export default function WhatsAppSetup() {
         <div className="border-t pt-4 space-y-3">
           <h3 className="text-sm font-medium text-gray-700 flex items-center gap-2"><Calendar size={16} /> Google Calendar</h3>
           {calConnected ? (
-            <div className="bg-green-50 rounded-xl p-4 text-sm space-y-1">
+            <div className="bg-green-50 rounded-xl p-4 text-sm space-y-3">
               <p className="text-green-700 font-medium flex items-center gap-2">✅ Calendrier connecté</p>
               <p className="text-green-600 text-xs">Les événements seront automatiquement ajoutés au calendrier quand une réservation reçoit une avance.</p>
+              <button onClick={handleDisconnectCalendar} className="text-sm text-red-600 hover:text-red-700 font-medium">
+                Déconnecter Google Calendar
+              </button>
             </div>
           ) : (
             <div className="bg-gray-50 rounded-xl p-4 text-sm space-y-2">

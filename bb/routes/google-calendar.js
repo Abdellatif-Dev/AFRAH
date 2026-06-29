@@ -27,6 +27,13 @@ router.get('/status', verifyToken, (req, res) => {
   });
 });
 
+router.post('/disconnect', verifyToken, (req, res) => {
+  db.run(`UPDATE google_tokens SET access_token = '', refresh_token = '', expiry_date = 0 WHERE id = 1`, (err) => {
+    if (err) return res.status(500).json({ message: 'Erreur de déconnexion' });
+    res.json({ message: 'Google Calendar déconnecté' });
+  });
+});
+
 router.post('/event', verifyToken, async (req, res) => {
   const { title, description, start, end } = req.body;
   if (!title || !start) return res.status(400).json({ message: 'Title and start date required' });

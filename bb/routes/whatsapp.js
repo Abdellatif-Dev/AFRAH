@@ -29,4 +29,13 @@ router.post('/restart', verifyToken, (req, res) => {
   res.json({ message: 'WhatsApp client restarting...' });
 });
 
+router.post('/disconnect', verifyToken, async (req, res) => {
+  try {
+    await whatsapp.disconnect();
+    res.json({ message: 'WhatsApp déconnecté' });
+  } catch {
+    res.status(500).json({ message: 'Erreur de déconnexion' });
+  }
+});
+
 module.exports = router;

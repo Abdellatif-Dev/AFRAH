@@ -183,4 +183,20 @@ async function restart() {
   setTimeout(init, 1000);
 }
 
-module.exports = { init, sendMessage, sendMedia, getQr, getStatus, restart };
+async function disconnect() {
+  if (client) {
+    try { await client.destroy(); } catch (e) { }
+  }
+  isInitialized = false;
+  isReady = false;
+  qrCode = null;
+  client = null;
+  // Supprimer le dossier session
+  const persistentDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
+  const sessionDir = path.join(persistentDir, 'whatsapp-data');
+  if (fs.existsSync(sessionDir)) {
+    try { fs.rmSync(sessionDir, { recursive: true, force: true }); } catch (e) { }
+  }
+}
+
+module.exports = { init, sendMessage, sendMedia, getQr, getStatus, restart, disconnect };
