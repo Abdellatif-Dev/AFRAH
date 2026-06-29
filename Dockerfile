@@ -1,5 +1,5 @@
 # Stage 1: Build the frontend
-FROM node:18-slim AS frontend-builder
+FROM node:22-slim AS frontend-builder
 WORKDIR /app/ff
 COPY ff/package*.json ./
 RUN npm ci
@@ -7,12 +7,13 @@ COPY ff/ ./
 RUN npm run build
 
 # Stage 2: Build the backend and run the service
-FROM node:18-slim
+FROM node:22-slim
 WORKDIR /app
 
 # Install system dependencies for whatsapp-web.js with Baileys (no Chrome needed)
 RUN apt-get update && apt-get install -y \
     ca-certificates \
+    build-essential \
     --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
