@@ -9,6 +9,7 @@ import API from '../../api/axios';
 import LoadingSpinner from '../../components/LoadingSpinner';
 import ConfirmModal from '../../components/ConfirmModal';
 
+// ✅ Ghir 4 status: pending | avance | canceled | termini
 const statusConfig = {
   pending: {
     label: 'En attente',
@@ -25,22 +26,6 @@ const statusConfig = {
     border: 'border-blue-200',
     icon: CheckCircle2,
     dot: 'bg-blue-500',
-  },
-  confirmed: {
-    label: 'Confirmée',
-    bg: 'bg-emerald-50',
-    text: 'text-emerald-700',
-    border: 'border-emerald-200',
-    icon: CheckCircle2,
-    dot: 'bg-emerald-500',
-  },
-  kamel: {
-    label: 'Payé (Kamel)',
-    bg: 'bg-green-50',
-    text: 'text-green-700',
-    border: 'border-green-200',
-    icon: CheckCircle2,
-    dot: 'bg-green-500',
   },
   termini: {
     label: 'Terminée',
@@ -75,7 +60,7 @@ export default function ManageOrders() {
   const limit = 10;
 
   // Confirm modals
-  const [confirmAction, setConfirmAction] = useState(null); // { type: 'confirm'|'cancel'|'delete'|'avance'|'kamel'|'termini', orderId, orderName }
+  const [confirmAction, setConfirmAction] = useState(null); // { type: 'avance'|'canceled'|'termini'|'delete', orderId, orderName }
   const [processing, setProcessing] = useState(false);
   const [advancePrice, setAdvancePrice] = useState('');
 
@@ -162,11 +147,7 @@ export default function ManageOrders() {
     const name = confirmAction.orderName;
     switch (confirmAction.type) {
       case 'avance':
-        return { title: 'Marquer avance', message: `Voulez-vous marquer la réservation de ${name} comme "Avance" ? Un événement sera ajouté au calendrier Google.` };
-      case 'confirmed':
-        return { title: 'Confirmer la réservation', message: `Voulez-vous confirmer la réservation de ${name} ? Un message WhatsApp sera envoyé au client.` };
-      case 'kamel':
-        return { title: 'Paiement complet', message: `Voulez-vous marquer la réservation de ${name} comme "Payée en totalité" ?` };
+        return { title: 'Marquer avance', message: `Voulez-vous marquer la réservation de ${name} comme "Avance" ? Un événement sera ajouté au calendrier Google et un message WhatsApp sera envoyé au client.` };
       case 'termini':
         return { title: 'Terminer', message: `Voulez-vous marquer la réservation de ${name} comme "Terminée" ?` };
       case 'canceled':
@@ -329,20 +310,6 @@ export default function ManageOrders() {
                             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                           </button>
                           <button
-                            onClick={() => setConfirmAction({ type: 'confirmed', orderId: order.id, orderName: order.customer_name })}
-                            className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-500 hover:text-emerald-600 transition-colors"
-                            title="Confirmer"
-                          >
-                            <CheckCircle2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => setConfirmAction({ type: 'kamel', orderId: order.id, orderName: order.customer_name })}
-                            className="p-2 rounded-lg hover:bg-green-50 text-green-500 hover:text-green-600 transition-colors"
-                            title="Payé (Kamel)"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          </button>
-                          <button
                             onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
                             className="p-2 rounded-lg hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-colors"
                             title="Annuler"
@@ -352,56 +319,6 @@ export default function ManageOrders() {
                         </>
                       )}
                       {order.status === 'avance' && (
-                        <>
-                          <button
-                            onClick={() => setConfirmAction({ type: 'confirmed', orderId: order.id, orderName: order.customer_name })}
-                            className="p-2 rounded-lg hover:bg-emerald-50 text-emerald-500 hover:text-emerald-600 transition-colors"
-                            title="Confirmer"
-                          >
-                            <CheckCircle2 size={16} />
-                          </button>
-                          <button
-                            onClick={() => setConfirmAction({ type: 'kamel', orderId: order.id, orderName: order.customer_name })}
-                            className="p-2 rounded-lg hover:bg-green-50 text-green-500 hover:text-green-600 transition-colors"
-                            title="Payé (Kamel)"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          </button>
-                          <button
-                            onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
-                            className="p-2 rounded-lg hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-colors"
-                            title="Annuler"
-                          >
-                            <XCircle size={16} />
-                          </button>
-                        </>
-                      )}
-                      {order.status === 'confirmed' && (
-                        <>
-                          <button
-                            onClick={() => setConfirmAction({ type: 'kamel', orderId: order.id, orderName: order.customer_name })}
-                            className="p-2 rounded-lg hover:bg-green-50 text-green-500 hover:text-green-600 transition-colors"
-                            title="Payé (Kamel)"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                          </button>
-                          <button
-                            onClick={() => setConfirmAction({ type: 'termini', orderId: order.id, orderName: order.customer_name })}
-                            className="p-2 rounded-lg hover:bg-indigo-50 text-indigo-500 hover:text-indigo-600 transition-colors"
-                            title="Terminée"
-                          >
-                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                          </button>
-                          <button
-                            onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
-                            className="p-2 rounded-lg hover:bg-rose-50 text-rose-400 hover:text-rose-600 transition-colors"
-                            title="Annuler"
-                          >
-                            <XCircle size={16} />
-                          </button>
-                        </>
-                      )}
-                      {order.status === 'kamel' && (
                         <>
                           <button
                             onClick={() => setConfirmAction({ type: 'termini', orderId: order.id, orderName: order.customer_name })}
@@ -523,12 +440,6 @@ export default function ManageOrders() {
                       <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Avance
                     </button>
                     <button
-                      onClick={() => setConfirmAction({ type: 'confirmed', orderId: order.id, orderName: order.customer_name })}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-emerald-50 text-emerald-600 text-xs font-medium hover:bg-emerald-100 transition-colors"
-                    >
-                      <CheckCircle2 size={13} /> Confirmer
-                    </button>
-                    <button
                       onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
                       className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-rose-50 text-rose-500 text-xs font-medium hover:bg-rose-100 transition-colors"
                     >
@@ -536,23 +447,7 @@ export default function ManageOrders() {
                     </button>
                   </>
                 )}
-                {['avance', 'confirmed'].includes(order.status) && (
-                  <>
-                    <button
-                      onClick={() => setConfirmAction({ type: 'kamel', orderId: order.id, orderName: order.customer_name })}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-green-50 text-green-600 text-xs font-medium hover:bg-green-100 transition-colors"
-                    >
-                      <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg> Kamel
-                    </button>
-                    <button
-                      onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
-                      className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-rose-50 text-rose-500 text-xs font-medium hover:bg-rose-100 transition-colors"
-                    >
-                      <XCircle size={13} /> Annuler
-                    </button>
-                  </>
-                )}
-                {order.status === 'kamel' && (
+                {order.status === 'avance' && (
                   <>
                     <button
                       onClick={() => setConfirmAction({ type: 'termini', orderId: order.id, orderName: order.customer_name })}
@@ -572,14 +467,6 @@ export default function ManageOrders() {
                   <div className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-gray-50 text-gray-400 text-xs font-medium">
                     Aucune action
                   </div>
-                )}
-                {!['termini', 'canceled'].includes(order.status) && order.status !== 'pending' && !['avance', 'confirmed', 'kamel'].includes(order.status) && (
-                  <button
-                    onClick={() => setConfirmAction({ type: 'canceled', orderId: order.id, orderName: order.customer_name })}
-                    className="flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg bg-rose-50 text-rose-500 text-xs font-medium hover:bg-rose-100 transition-colors"
-                  >
-                    <XCircle size={13} /> Annuler
-                  </button>
                 )}
                 <button
                   onClick={() => setConfirmAction({ type: 'delete', orderId: order.id, orderName: order.customer_name })}

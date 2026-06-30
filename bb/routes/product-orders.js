@@ -88,14 +88,7 @@ Nous avons bien reçu votre commande pour :
 📦 *${productTitle}*
 💰 *Prix :* ${productPrice} DH
 
-━━━━━━━━━━━━━━━━
-👉 *Veuillez choisir une option :*
 
-✅ *Accepter la commande :*
-${acceptLink}
-
-❌ *Refuser la commande :*
-${refuseLink}
 
 Merci de nous avoir choisis ! 🤍
 

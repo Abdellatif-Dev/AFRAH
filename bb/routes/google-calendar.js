@@ -35,18 +35,35 @@ router.post('/disconnect', verifyToken, (req, res) => {
 });
 
 router.post('/event', verifyToken, async (req, res) => {
-  const { title, description, start, end } = req.body;
+  // استقبال البيانات الإضافية من الـ Request Body
+  const { title, description, start, end, customer_name, phone, advance_price } = req.body;
   if (!title || !start) return res.status(400).json({ message: 'Title and start date required' });
 
   db.get(`SELECT access_token, refresh_token, expiry_date FROM google_tokens WHERE id = 1`, async (err, row) => {
     if (err || !row || !row.access_token) return res.status(400).json({ message: 'Calendar not connected' });
 
     try {
+      // بناء وصف منسق يحتوي على معلومات الزبون والعربون
+      const enrichedDescription = `
+👤 العميل: ${customer_name || 'غير محدد'}
+📞 الهاتف: ${phone || 'غير محدد'}
+💰 العربون (Avance): ${advance_price || 0} DH
+---------------------------------------------
+📝 تفاصيل إضافية:
+${description || 'لا توجد تفاصيل'}
+      `.trim();
+
       await addEventToCalendar({
         access_token: row.access_token,
         refresh_token: row.refresh_token,
         expiry_date: row.expiry_date
-      }, { title, description, start, end: end || start });
+      }, {
+        title,
+        description: enrichedDescription, // استخدام الوصف المنسق الجديد
+        start,
+        end: end || start
+      });
+
       res.json({ message: 'Event created' });
     } catch (err) {
       res.status(500).json({ message: 'Failed to create event: ' + err.message });

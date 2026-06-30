@@ -10,6 +10,9 @@ const router = express.Router();
 // ⚠️ BDEL HADI B DOMAIN DIALK
 const BASE_URL = process.env.BASE_URL || 'http://localhost:5000';
 
+// ✅ Status dyal had system: pending | avance | canceled | termini
+const VALID_STATUSES = ['pending', 'avance', 'canceled', 'termini'];
+
 router.post('/', (req, res) => {
   console.log('📩 [Orders] Received package order request:', req.body);
   const { customer_name, phone, address, event_date, package_id, notes, custom_items } = req.body;
@@ -18,8 +21,9 @@ router.post('/', (req, res) => {
     return res.status(400).json({ message: 'Name and phone are required' });
   }
 
-  db.run('INSERT INTO orders (customer_name, phone, address, event_date, package_id, notes, custom_items) VALUES (?, ?, ?, ?, ?, ?, ?)',
-    [customer_name, phone, address || '', event_date || '', package_id || null, notes || '', custom_items || ''],
+  // ✅ Kol commande jdida kat-dkhol b status 'pending'
+  db.run('INSERT INTO orders (customer_name, phone, address, event_date, package_id, notes, custom_items, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+    [customer_name, phone, address || '', event_date || '', package_id || null, notes || '', custom_items || '', 'pending'],
     function (err) {
       if (err) {
         console.error('❌ [Orders] Database insertion error:', err.message);
@@ -29,33 +33,27 @@ router.post('/', (req, res) => {
       const orderId = this.lastID;
       console.log('✅ [Orders] Order inserted into DB with ID:', orderId);
 
+      // إرجاع الاستجابة فوراً للواجهة الأمامية
       res.status(201).json({ id: orderId, message: 'Order placed successfully' });
 
+      // معالجة إرسال رسائل الواتساب في الخلفية
       db.get(`
         SELECT o.*, p.title as package_title, p.image as package_image
         FROM orders o
         LEFT JOIN packages p ON o.package_id = p.id
         WHERE o.id = ?
       `, [orderId], async (err, order) => {
-        if (err) {
-          console.error('❌ [Orders] Error fetching order for WhatsApp:', err.message);
+        if (err || !order) {
+          console.error('❌ [Orders] Error fetching order for WhatsApp:', err?.message);
           return;
         }
-        if (!order) {
-          console.warn('⚠️ [Orders] Order not found in DB after insertion:', orderId);
-          return;
-        }
-        console.log('📦 [Orders] Fetched order details for WhatsApp:', order);
-
-        // ✅ LINKS JDIAD BACH Y9DER YACCEPTE WLA YREFUSE
-        const confirmLink = `${BASE_URL}/api/orders/${order.id}/confirm`;
-        const cancelLink = `${BASE_URL}/api/orders/${order.id}/cancel`;
 
         const forfaitDisplay = order.package_title || (order.custom_items ? 'Forfait Personnalisé 🛠️' : 'Non spécifié');
         const customItemsDisplay = order.custom_items 
           ? `🛍️ Éléments :\n${order.custom_items.split(', ').map(item => `  • ${item}`).join('\n')}\n━━━━━━━━━━━━━━━━━━\n`
           : '';
 
+        // 1️⃣ رسالة الزبون (خالية تماماً من أي روابط تأكيد أو إلغاء)
         const clientMsg = `✨ *AFRAH — MARIAGE & ÉVÉNEMENTS* ✨
 ━━━━━━━━━━━━━━━━━━
 Bonjour *${order.customer_name}* 👋
@@ -64,22 +62,15 @@ Nous avons bien reçu votre demande de réservation. Merci infiniment pour votre
 
 🧾 *Récapitulatif*
 ━━━━━━━━━━━━━━━━━━
-🔖 Commande : *#${order.id}*
 📦 Forfait : *${forfaitDisplay}*
 ${customItemsDisplay}📅 Date événement : *${order.event_date || 'À confirmer'}*
-━━━━━━━━━━━━━━━━━━
 
-⏳ *Statut :* En attente de confirmation
-
-👉 *Veuillez choisir une option :*
-
-✅ *Accepter :* ${confirmLink}
-❌ *Refuser :* ${cancelLink}
 
 Merci de nous avoir choisis pour ce moment si spécial 💫
 
 _Afrah - Mariage & Événements_`;
 
+        // 2️⃣ رسالة الأدمن (تحتوي على روابط التحكم الخاصة بالأدمن فقط)
         const adminMsg = `🆕 *Nouvelle commande #${order.id}*
 
 👤 *Client :* ${order.customer_name}
@@ -90,52 +81,42 @@ _Afrah - Mariage & Événements_`;
 ${order.custom_items ? `🛍️ Éléments :\n${order.custom_items.split(', ').map(item => `  • ${item}`).join('\n')}\n` : ''}📝 *Notes :* ${order.notes || 'Aucune'}
 🕐 *Date commande :* ${order.created_at?.slice(0, 16) || ''}
 
-👉 *Liens rapides :*
-✅ Confirmer : ${confirmLink}
-❌ Annuler : ${cancelLink}`;
+👉 *Liens rapides (Avance) :*
+✅ Accepter avance: ${BASE_URL}/api/orders/${order.id}/confirm
+❌ Refuser: ${BASE_URL}/api/orders/${order.id}/cancel`;
 
-        let sent = false;
-
+        // ----------------- إرسال الرسالة للزبون أولاً -----------------
         const baseDir = process.env.PERSISTENT_DIR || path.join(__dirname, '..');
         const imagePath = order.package_image
           ? path.join(baseDir, 'uploads', 'packages', order.package_image)
           : null;
 
-        console.log(`📱 [Orders] Dispatched orders.phone: ${order.phone}. package_image: ${order.package_image} (Path: ${imagePath}, Exists: ${imagePath ? fs.existsSync(imagePath) : 'no'})`);
-
+        let clientSent = false;
         if (imagePath && fs.existsSync(imagePath)) {
-          console.log(`📱 [Orders] Attempting sendMedia to ${order.phone}`);
-          sent = await whatsapp.sendMedia(order.phone, imagePath, clientMsg);
+          clientSent = await whatsapp.sendMedia(order.phone, imagePath, clientMsg);
+        } else {
+          clientSent = await whatsapp.sendMessage(order.phone, clientMsg);
         }
+        console.log(`📱 [Orders] Client WhatsApp send outcome: ${clientSent ? 'SUCCESS' : 'FAILED'}`);
 
-        if (!sent) {
-          console.log(`📱 [Orders] Attempting sendMessage to ${order.phone}`);
-          sent = await whatsapp.sendMessage(order.phone, clientMsg);
-        }
-
-        console.log(`📱 [Orders] WhatsApp send outcome: ${sent ? 'SUCCESS' : 'FAILED'}`);
-
-        // ✅ ila num li dkhl l'user (client) khate2 / ma siftech,
-        // sift l'alerte l-admin b numéro li jaye mn settings.whatsapp_chat
-        if (!sent) {
-          try {
-            const settings = await new Promise((resolve, reject) => {
-              db.get('SELECT whatsapp_chat FROM settings ORDER BY id ASC LIMIT 1', [], (err, row) => {
-                if (err) reject(err);
-                else resolve(row);
-              });
+        // ----------------- إرسال إشعار للأدمن دائماً وبشكل مستقل -----------------
+        try {
+          const settings = await new Promise((resolve, reject) => {
+            db.get('SELECT whatsapp_chat FROM settings ORDER BY id ASC LIMIT 1', [], (err, row) => {
+              if (err) reject(err);
+              else resolve(row);
             });
+          });
 
-            const adminNumber = settings?.whatsapp_chat?.trim();
-            if (!adminNumber) {
-              console.error('⚠️ whatsapp_chat machi configuré f settings');
-            } else {
-              await whatsapp.sendMessage(adminNumber, adminMsg);
-              console.log('✅ Admin notified');
-            }
-          } catch (err) {
-            console.error('Erreur:', err);
+          const adminNumber = settings?.whatsapp_chat?.trim();
+          if (adminNumber) {
+            await whatsapp.sendMessage(adminNumber, adminMsg);
+            console.log('✅ [Orders] Admin notified successfully with control links');
+          } else {
+            console.warn('⚠️ [Orders] adminNumber is not configured in settings');
           }
+        } catch (adminErr) {
+          console.error('❌ [Orders] Error notifying Admin:', adminErr);
         }
       });
     }
@@ -182,8 +163,7 @@ router.get('/', verifyToken, (req, res) => {
 
 router.put('/:id', verifyToken, (req, res) => {
   const { status, advance_price } = req.body;
-  const validStatuses = ['pending', 'avance', 'confirmed', 'kamel', 'termini', 'canceled'];
-  if (!validStatuses.includes(status)) {
+  if (!VALID_STATUSES.includes(status)) {
     return res.status(400).json({ message: 'Invalid status' });
   }
 
@@ -199,11 +179,15 @@ router.put('/:id', verifyToken, (req, res) => {
   params.push(req.params.id);
 
   db.run(sql, params, function (err) {
-    if (err) { console.error('❌ [Orders PUT] SQL error:', err.message, 'SQL:', sql, 'Params:', params); return res.status(500).json({ message: 'Server error' }); }
+    if (err) { 
+      console.error('❌ [Orders PUT] SQL error:', err.message, 'SQL:', sql, 'Params:', params); 
+      return res.status(500).json({ message: 'Server error' }); 
+    }
     if (this.changes === 0) return res.status(404).json({ message: 'Order not found' });
 
     res.json({ message: 'Order updated successfully' });
 
+    // ✅ Mli status ywlli 'avance' (avance t9oblat) -> dir event f Google Calendar
     if (status === 'avance') {
       db.get(`SELECT o.*, p.title as package_title FROM orders o LEFT JOIN packages p ON o.package_id = p.id WHERE o.id = ?`, [req.params.id], async (err, order) => {
         if (err || !order) return;
@@ -213,11 +197,23 @@ router.put('/:id', verifyToken, (req, res) => {
 
           try {
             const { addEventToCalendar } = require('../services/googleCalendar');
-            const startTime = order.event_date ? new Date(order.event_date + 'T09:00:00').toISOString() : new Date().toISOString();
-            const endTime = order.event_date ? new Date(order.event_date + 'T18:00:00').toISOString() : new Date().toISOString();
+            
+            // ✅ حماية برمجية لتفادي توقف السيرفر في حالة عدم كتابة التاريخ أو وجود خطأ به
+            let startTime = new Date().toISOString();
+            let endTime = new Date().toISOString();
+
+            if (order.event_date && order.event_date.trim() !== '') {
+              const parsedStart = new Date(order.event_date + 'T09:00:00');
+              const parsedEnd = new Date(order.event_date + 'T18:00:00');
+              
+              if (!isNaN(parsedStart.getTime())) startTime = parsedStart.toISOString();
+              if (!isNaN(parsedEnd.getTime())) endTime = parsedEnd.toISOString();
+            }
+
             await addEventToCalendar(tokens, {
               title: `${order.customer_name} - ${order.package_title || 'Événement'}`,
-              description: `Client: ${order.customer_name}\nTél: ${order.phone}\nAdresse: ${order.address || ''}\nNotes: ${order.notes || ''}`,
+              // ✅ إضافة العربون (advance_price) إلى وصف التقويم
+              description: `Client: ${order.customer_name}\nTél: ${order.phone}\nAdresse: ${order.address || ''}\nAvance (العربون): ${order.advance_price || advance_price || 0} DH\nNotes: ${order.notes || ''}`,
               start: startTime,
               end: endTime,
             });
@@ -228,31 +224,19 @@ router.put('/:id', verifyToken, (req, res) => {
       });
     }
 
-    if (['confirmed', 'canceled', 'kamel', 'termini'].includes(status)) {
+    // ✅ Rsayel WhatsApp 7sb status: avance | canceled | termini
+    if (['avance', 'canceled', 'termini'].includes(status)) {
       db.get(`SELECT o.* FROM orders o WHERE o.id = ?`, [req.params.id], async (err, order) => {
         if (err || !order) return;
 
-        if (status === 'confirmed') {
-          const msg = `✅ *Réservation confirmée — #${order.id}*
+        if (status === 'avance') {
+          const msg = `✅ *Avance confirmée — #${order.id}*
 
 Bonjour *${order.customer_name}* 👋
 
-Excellente nouvelle ! Votre réservation est désormais *confirmée* 🎉
+Votre avance a été reçue et votre réservation est désormais *confirmée* 🎉
 
 Notre équipe vous contactera bientôt pour les derniers détails. À très vite ✨
-
-_Afrah - Mariage & Événements_`;
-          await whatsapp.sendMessage(order.phone, msg);
-        }
-
-        if (status === 'kamel') {
-          const msg = `✅ *Paiement complet — #${order.id}*
-
-Bonjour *${order.customer_name}* 👋
-
-Votre paiement a été reçu en totalité. Merci pour votre confiance 🤍
-
-Tout est prêt pour votre événement ! 🎉
 
 _Afrah - Mariage & Événements_`;
           await whatsapp.sendMessage(order.phone, msg);
@@ -288,22 +272,23 @@ _Afrah - Mariage & Événements_`;
   });
 });
 
-// ✅ ROUTES JDIAD — BACH Y9DER YACCEPTE WLA YREFUSE B LINK
+// ✅ ROUTES JDIAD — BACH Y9DER YACCEPTE WLA YREFUSE L'AVANCE B LINK (mn WhatsApp)
 router.get('/:id/confirm', (req, res) => {
   const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).send('ID invalide');
 
-  db.run('UPDATE orders SET status = ? WHERE id = ?', ['confirmed', id], function (err) {
+  // ✅ Confirm = ywlli status 'avance' (avance t9oblat)
+  db.run('UPDATE orders SET status = ? WHERE id = ?', ['avance', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
     if (this.changes === 0) return res.status(404).send('Commande introuvable');
 
     db.get('SELECT * FROM orders WHERE id = ?', [id], async (err, order) => {
-      // Sifet confirmation msg l client
       if (order) {
-        const msg = `✅ *Réservation confirmée — #${order.id}*
+        const msg = `✅ *Avance confirmée — #${order.id}*
 
 Bonjour *${order.customer_name}* 👋
 
-Votre réservation a été *confirmée* avec succès ! 🎉
+Votre avance a été reçue et votre réservation est *confirmée* avec succès ! 🎉
 
 Notre équipe vous contactera bientôt pour les derniers détails. À très vite ✨
 
@@ -312,14 +297,13 @@ _Afrah - Mariage & Événements_`;
       }
     });
 
-    // Page HTML zwin bach yweli f telephone
     res.send(`
       <!DOCTYPE html>
       <html lang="fr" dir="ltr">
       <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>✅ Réservation Confirmée — AfraH</title>
+        <title>✅ Avance Confirmée — AfraH</title>
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body {
@@ -378,9 +362,9 @@ _Afrah - Mariage & Événements_`;
       <body>
         <div class="card">
           <div class="icon">✅</div>
-          <h1>Réservation Confirmée !</h1>
+          <h1>Avance Confirmée !</h1>
           <div class="order-id">Commande #${id}</div>
-          <p>Votre réservation a été confirmée avec succès.</p>
+          <p>L'avance de cette réservation a été confirmée avec succès.</p>
           <p>Notre équipe vous contactera très prochainement pour finaliser les détails.</p>
           <div class="footer">Afrah — Mariage & Événements 💫</div>
         </div>
@@ -392,6 +376,7 @@ _Afrah - Mariage & Événements_`;
 
 router.get('/:id/cancel', (req, res) => {
   const id = parseInt(req.params.id, 10);
+  if (isNaN(id)) return res.status(400).send('ID invalide');
 
   db.run('UPDATE orders SET status = ? WHERE id = ?', ['canceled', id], function (err) {
     if (err) return res.status(500).send('Erreur serveur');
